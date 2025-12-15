@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/captcha_widget.dart';
 import '../theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,9 +14,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _captchaController = TextEditingController();
   
-  String _targetCaptcha = "";
   String? _errorMessage;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -49,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _animationController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
-    _captchaController.dispose();
     super.dispose();
   }
 
@@ -58,14 +54,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       _errorMessage = null;
       _isLoading = true;
     });
-
-    if (_captchaController.text.toUpperCase() != _targetCaptcha) {
-      setState(() {
-        _errorMessage = "Captcha salah! Silakan coba lagi.";
-        _isLoading = false;
-      });
-      return;
-    }
 
     // Simulate network delay for better UX
     await Future.delayed(const Duration(milliseconds: 500));
@@ -90,12 +78,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFF1E3A8A),
-              Color(0xFF3B82F6),
-              Color(0xFF6366F1),
+              Color(0xFF1E3A8A),  // Dark Navy Blue
+              Color(0xFF3B82F6),  // Blue
+              Color(0xFF60A5FA),  // Light Blue
+              Color(0xFF93C5FD),  // Sky Blue
             ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
         child: SafeArea(
@@ -135,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                                    color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -143,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   "Silakan masuk untuk melanjutkan",
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey.shade600,
+                                    color: Colors.white.withAlpha(200),
                                   ),
                                 ),
                                 const SizedBox(height: 32),
@@ -151,12 +140,25 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 // Username Field
                                 TextField(
                                   controller: _usernameController,
+                                  style: const TextStyle(color: Color(0xFF1E3A8A)),
                                   decoration: InputDecoration(
-                                    labelText: "Username",
-                                    hintText: "Masukkan username",
-                                    prefixIcon: const Icon(Icons.person_outline_rounded),
+                                    hintText: "Username",
+                                    hintStyle: TextStyle(color: Colors.grey.shade500),
+                                    prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.grey.shade600),
                                     filled: true,
-                                    fillColor: Colors.grey.shade50,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey.shade400),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 20),
@@ -165,18 +167,31 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 TextField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
+                                  style: const TextStyle(color: Color(0xFF1E3A8A)),
                                   decoration: InputDecoration(
-                                    labelText: "Password",
-                                    hintText: "Masukkan password",
-                                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                    hintText: "Password",
+                                    hintStyle: TextStyle(color: Colors.grey.shade500),
+                                    prefixIcon: Icon(Icons.lock_outline_rounded, color: Colors.grey.shade600),
                                     filled: true,
-                                    fillColor: Colors.grey.shade50,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey.shade400),
+                                    ),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _obscurePassword 
                                           ? Icons.visibility_off_outlined 
                                           : Icons.visibility_outlined,
-                                        color: Colors.grey,
+                                        color: Colors.grey.shade600,
                                       ),
                                       onPressed: () {
                                         setState(() {
@@ -187,56 +202,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   ),
                                 ),
                                 const SizedBox(height: 24),
-                                
-                                // Captcha Section
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.grey.shade200),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.security, size: 18, color: Colors.grey.shade600),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            "Verifikasi Keamanan",
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      CaptchaWidget(
-                                        onCaptchaChanged: (newVal) {
-                                          if (mounted) {
-                                            setState(() {
-                                              _targetCaptcha = newVal;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                      const SizedBox(height: 12),
-                                      TextField(
-                                        controller: _captchaController,
-                                        textCapitalization: TextCapitalization.characters,
-                                        decoration: const InputDecoration(
-                                          labelText: "Masukkan Captcha",
-                                          hintText: "Ketik kode di atas",
-                                          prefixIcon: Icon(Icons.keyboard_rounded),
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                                 
                                 // Error Message
                                 if (_errorMessage != null) ...[
@@ -274,9 +239,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   height: 56,
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      gradient: AppColors.primaryGradient,
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF3B82F6),  // Blue
+                                          Color(0xFF60A5FA),  // Light Blue
+                                          Color(0xFF93C5FD),  // Sky Blue
+                                        ],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                      ),
                                       borderRadius: BorderRadius.circular(12),
-                                      boxShadow: AppColors.buttonShadow,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF1E3A8A).withAlpha(80),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
                                     ),
                                     child: ElevatedButton(
                                       onPressed: _isLoading ? null : _login,
@@ -306,8 +285,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
                                                     letterSpacing: 1,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                               ],
@@ -319,15 +298,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             ),
                           ),
                         ),
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 32),
-                        Text(
-                          "© 2024 HR Dashboard. All rights reserved.",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.6),
                           ),
                         ),
                       ],

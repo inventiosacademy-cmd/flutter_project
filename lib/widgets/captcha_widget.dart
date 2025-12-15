@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -12,21 +11,22 @@ class CaptchaWidget extends StatefulWidget {
 }
 
 class _CaptchaWidgetState extends State<CaptchaWidget> with SingleTickerProviderStateMixin {
-  String _captcha = "";
+  bool _isVerified = false;
+  bool _isLoading = false;
   late AnimationController _animationController;
-  late Animation<double> _rotationAnimation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 200),
     );
-    _rotationAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
-    _generateCaptcha();
+    // Don't call callback here - it causes setState during build
   }
 
   @override
@@ -35,148 +35,116 @@ class _CaptchaWidgetState extends State<CaptchaWidget> with SingleTickerProvider
     super.dispose();
   }
 
-  void _generateCaptcha() {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    final random = Random();
-    String newCaptcha = String.fromCharCodes(Iterable.generate(
-      5, (_) => chars.codeUnitAt(random.nextInt(chars.length))));
+  void _onTap() async {
+    if (_isVerified || _isLoading) return;
     
     setState(() {
-      _captcha = newCaptcha;
+      _isLoading = true;
     });
-    
-    // Animate refresh button
-    _animationController.forward(from: 0);
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        widget.onCaptchaChanged(newCaptcha);
-      }
-    });
+
+    // Simulate verification delay
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _isVerified = true;
+      });
+      
+      _animationController.forward();
+      widget.onCaptchaChanged("VERIFIED");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.grey.shade100,
-            Colors.grey.shade200,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFFD3D3D3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(10),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Captcha Display
-          Expanded(
+          // Checkbox area
+          GestureDetector(
+            onTap: _onTap,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(
+                  color: _isVerified ? AppColors.success : const Color(0xFFC1C1C1),
+                  width: 2,
+                ),
               ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Noise lines
-                  CustomPaint(
-                    size: const Size(120, 36),
-                    painter: _CaptchaNoisePainter(),
-                  ),
-                  // Captcha text
-                  Text(
-                    _captcha,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 8,
-                      fontFamily: 'Courier',
-                      foreground: Paint()
-                        ..shader = const LinearGradient(
-                          colors: [
-                            AppColors.primaryBlue,
-                            AppColors.primaryIndigo,
-                          ],
-                        ).createShader(const Rect.fromLTWH(0, 0, 150, 36)),
-                    ),
-                  ),
-                ],
-              ),
+              child: _isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                      ),
+                    )
+                  : _isVerified
+                      ? ScaleTransition(
+                          scale: _scaleAnimation,
+                          child: const Icon(
+                            Icons.check,
+                            color: AppColors.success,
+                            size: 20,
+                          ),
+                        )
+                      : null,
             ),
           ),
           const SizedBox(width: 12),
           
-          // Refresh Button
-          RotationTransition(
-            turns: _rotationAnimation,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _generateCaptcha,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.refresh_rounded,
-                    color: AppColors.primaryBlue,
-                    size: 24,
-                  ),
+          // Text
+          Expanded(
+            child: GestureDetector(
+              onTap: _onTap,
+              child: Text(
+                "Saya bukan robot",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade800,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),
+          ),
+          
+          // reCAPTCHA logo simulation
+          Column(
+            children: [
+              Icon(
+                Icons.security,
+                size: 28,
+                color: Colors.grey.shade400,
+              ),
+              Text(
+                "reCAPTCHA",
+                style: TextStyle(
+                  fontSize: 8,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
-}
-
-// Custom painter for captcha noise effect
-class _CaptchaNoisePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final random = Random(42); // Fixed seed for consistent look
-    final paint = Paint()
-      ..color = Colors.grey.withOpacity(0.3)
-      ..strokeWidth = 1;
-
-    // Draw random lines
-    for (int i = 0; i < 5; i++) {
-      canvas.drawLine(
-        Offset(random.nextDouble() * size.width, random.nextDouble() * size.height),
-        Offset(random.nextDouble() * size.width, random.nextDouble() * size.height),
-        paint,
-      );
-    }
-
-    // Draw random dots
-    for (int i = 0; i < 20; i++) {
-      canvas.drawCircle(
-        Offset(random.nextDouble() * size.width, random.nextDouble() * size.height),
-        1,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
