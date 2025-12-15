@@ -8,6 +8,10 @@ class EmployeeProvider with ChangeNotifier {
 
   List<Employee> get employees => [..._employees]; // Return copy
 
+  List<Evaluation> get evaluations {
+    return _evaluations.values.expand((list) => list).toList();
+  }
+
   List<Employee> get expiringContracts {
     return _employees.where((e) {
       final days = e.hariMenujuExpired;
