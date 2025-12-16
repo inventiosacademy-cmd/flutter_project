@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/employee_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/main_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
             title: 'HR Dashboard',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
-            home: auth.isLoggedIn ? const DashboardScreen() : const LoginScreen(),
+            home: auth.isLoggedIn ? const MainScreen() : const LoginScreen(),
           );
         },
       ),
