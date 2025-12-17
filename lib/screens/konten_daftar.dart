@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/employee_provider.dart';
-import '../theme/app_colors.dart';
-import 'employee_form_screen.dart';
-import 'evaluation_form_screen.dart';
+import '../providers/prov_karyawan.dart';
+import '../models/karyawan.dart';
+import '../theme/warna.dart';
 
 class EmployeeListContent extends StatefulWidget {
-  const EmployeeListContent({super.key});
+  final VoidCallback? onTambahKaryawan;
+  final Function(Employee)? onEvaluasi;
+  final Function(Employee)? onViewDetail;
+  
+  const EmployeeListContent({
+    super.key, 
+    this.onTambahKaryawan, 
+    this.onEvaluasi,
+    this.onViewDetail,
+  });
 
   @override
   State<EmployeeListContent> createState() => _EmployeeListContentState();
@@ -16,6 +24,17 @@ class EmployeeListContent extends StatefulWidget {
 class _EmployeeListContentState extends State<EmployeeListContent> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  
+  // Filter states
+  String _selectedDept = 'Semua';
+  String _selectedStatus = 'Semua';
+  
+  // Pagination states
+  int _currentPage = 1;
+  int _itemsPerPage = 10;
+  
+  final List<String> _deptList = ['Semua', 'IT', 'Human Resources', 'Finance', 'Marketing', 'Sales', 'Operations', 'Product', 'Legal'];
+  final List<String> _statusList = ['Semua', 'Aktif', 'Segera Habis', 'Expired'];
 
   @override
   void dispose() {
@@ -74,11 +93,7 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (ctx) => const EmployeeFormScreen()),
-                        );
-                      },
+                      onPressed: widget.onTambahKaryawan,
                       icon: const Icon(Icons.add, size: 18),
                       label: const Text("Tambah Karyawan"),
                       style: ElevatedButton.styleFrom(
@@ -102,6 +117,8 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
               builder: (context, data, _) {
                 final total = data.employees.length;
                 final aktif = data.employees.where((e) => e.hariMenujuExpired > 30).length;
+                final tidakAktif = data.employees.where((e) => e.hariMenujuExpired <= 0).length;
+                final pkwtSegeraHabis = data.employees.where((e) => e.hariMenujuExpired > 0 && e.hariMenujuExpired <= 30).length;
 
                 return Row(
                   children: [
@@ -111,8 +128,6 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                       iconColor: const Color(0xFF6366F1),
                       label: "Total Karyawan",
                       value: "$total",
-                      badge: "+5% bulan ini",
-                      badgeColor: const Color(0xFF22C55E),
                     )),
                     const SizedBox(width: 16),
                     Expanded(child: _buildStatCard(
@@ -121,8 +136,22 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                       iconColor: const Color(0xFF22C55E),
                       label: "Karyawan Aktif",
                       value: "$aktif",
-                      badge: "+2% bulan ini",
-                      badgeColor: const Color(0xFF22C55E),
+                    )),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildStatCard(
+                      icon: Icons.cancel_outlined,
+                      iconBgColor: const Color(0xFFFEE2E2),
+                      iconColor: const Color(0xFFEF4444),
+                      label: "Tidak Aktif",
+                      value: "$tidakAktif",
+                    )),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildStatCard(
+                      icon: Icons.warning_amber_outlined,
+                      iconBgColor: const Color(0xFFFEF3C7),
+                      iconColor: const Color(0xFFF59E0B),
+                      label: "PKWT Segera Habis",
+                      value: "$pkwtSegeraHabis",
                     )),
                   ],
                 );
@@ -174,11 +203,9 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      _buildFilterDropdown("Semua Dept."),
+                      _buildDeptDropdown(),
                       const SizedBox(width: 12),
-                      _buildFilterDropdown("Status Kontrak"),
-                      const SizedBox(width: 12),
-                      _buildFilterDropdown("Durasi Kerja"),
+                      _buildStatusDropdown(),
                     ],
                   ),
 
@@ -196,8 +223,9 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                         _buildTableHeader("KARYAWAN", flex: 2),
                         _buildTableHeader("ID KARYAWAN", flex: 1),
                         _buildTableHeader("DEPARTEMEN", flex: 1),
-                        _buildTableHeader("DURASI KERJA", flex: 1),
-                        _buildTableHeader("STATUS KONTRAK", flex: 2),
+                        _buildTableHeader("MASA KERJA", flex: 1),
+                        _buildTableHeader("SISA KONTRAK", flex: 1),
+                        _buildTableHeader("STATUS", flex: 1),
                         _buildTableHeader("AKSI", flex: 1, center: true),
                       ],
                     ),
@@ -206,10 +234,25 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                   // Table Content
                   Consumer<EmployeeProvider>(
                     builder: (context, data, _) {
-                      final employees = data.employees
+                      var employees = data.employees
                           .where((e) => e.nama.toLowerCase().contains(_searchQuery) ||
                                        e.email.toLowerCase().contains(_searchQuery))
                           .toList();
+                      
+                      // Filter by department
+                      if (_selectedDept != 'Semua') {
+                        employees = employees.where((e) => e.departemen == _selectedDept).toList();
+                      }
+                      
+                      // Filter by status
+                      if (_selectedStatus != 'Semua') {
+                        employees = employees.where((e) {
+                          if (_selectedStatus == 'Aktif') return e.hariMenujuExpired > 30;
+                          if (_selectedStatus == 'Segera Habis') return e.hariMenujuExpired > 0 && e.hariMenujuExpired <= 30;
+                          if (_selectedStatus == 'Expired') return e.hariMenujuExpired <= 0;
+                          return true;
+                        }).toList();
+                      }
 
                       if (employees.isEmpty) {
                         return Container(
@@ -231,9 +274,20 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                         );
                       }
 
+                      // Paginate
+                      final totalItems = employees.length;
+                      if (totalItems == 0) {
+                        return const SizedBox.shrink();
+                      }
+                      final totalPages = (totalItems / _itemsPerPage).ceil();
+                      final safeCurrentPage = _currentPage.clamp(1, totalPages);
+                      final startIndex = (safeCurrentPage - 1) * _itemsPerPage;
+                      final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
+                      final paginatedEmployees = employees.sublist(startIndex, endIndex);
+
                       return Column(
-                        children: employees.asMap().entries.map((entry) {
-                          final index = entry.key;
+                        children: paginatedEmployees.asMap().entries.map((entry) {
+                          final index = startIndex + entry.key;
                           final emp = entry.value;
                           return _buildEmployeeRow(context, emp, index, data);
                         }).toList(),
@@ -246,6 +300,30 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                   // Pagination
                   Consumer<EmployeeProvider>(
                     builder: (context, data, _) {
+                      // Apply same filters to get correct total
+                      var filteredEmployees = data.employees
+                          .where((e) => e.nama.toLowerCase().contains(_searchQuery) ||
+                                       e.email.toLowerCase().contains(_searchQuery))
+                          .toList();
+                      
+                      if (_selectedDept != 'Semua') {
+                        filteredEmployees = filteredEmployees.where((e) => e.departemen == _selectedDept).toList();
+                      }
+                      
+                      if (_selectedStatus != 'Semua') {
+                        filteredEmployees = filteredEmployees.where((e) {
+                          if (_selectedStatus == 'Aktif') return e.hariMenujuExpired > 30;
+                          if (_selectedStatus == 'Segera Habis') return e.hariMenujuExpired > 0 && e.hariMenujuExpired <= 30;
+                          if (_selectedStatus == 'Expired') return e.hariMenujuExpired <= 0;
+                          return true;
+                        }).toList();
+                      }
+                      
+                      final totalItems = filteredEmployees.length;
+                      final totalPages = totalItems == 0 ? 1 : (totalItems / _itemsPerPage).ceil();
+                      final startItem = totalItems == 0 ? 0 : ((_currentPage - 1) * _itemsPerPage) + 1;
+                      final endItem = (_currentPage * _itemsPerPage).clamp(0, totalItems);
+                      
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -253,33 +331,58 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                             children: [
                               Text("Menampilkan", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                               const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey.shade300),
-                                  borderRadius: BorderRadius.circular(6),
+                              PopupMenuButton<int>(
+                                initialValue: _itemsPerPage,
+                                onSelected: (val) => setState(() {
+                                  _itemsPerPage = val;
+                                  _currentPage = 1;
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text("$_itemsPerPage", style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+                                    ],
+                                  ),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Text("10", style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
-                                    const SizedBox(width: 4),
-                                    Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
-                                  ],
-                                ),
+                                itemBuilder: (context) => [5, 10, 25, 50].map((val) => 
+                                  PopupMenuItem(value: val, child: Text("$val"))
+                                ).toList(),
                               ),
                               const SizedBox(width: 8),
-                              Text("dari ${data.employees.length} data", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                              Text("dari $totalItems data", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                             ],
                           ),
                           Row(
                             children: [
-                              _buildPageButton("<", false),
-                              _buildPageButton("1", true),
-                              _buildPageButton("2", false),
-                              _buildPageButton("3", false),
-                              Text("...", style: TextStyle(color: Colors.grey.shade400)),
-                              _buildPageButton("12", false),
-                              _buildPageButton(">", false),
+                              // Previous button
+                              _buildPageButton("<", false, onTap: _currentPage > 1 ? () => setState(() => _currentPage--) : null),
+                              // Page buttons
+                              ...List.generate(totalPages.clamp(0, 5), (index) {
+                                int pageNum;
+                                if (totalPages <= 5) {
+                                  pageNum = index + 1;
+                                } else if (_currentPage <= 3) {
+                                  pageNum = index + 1;
+                                } else if (_currentPage >= totalPages - 2) {
+                                  pageNum = totalPages - 4 + index;
+                                } else {
+                                  pageNum = _currentPage - 2 + index;
+                                }
+                                return _buildPageButton("$pageNum", _currentPage == pageNum, onTap: () => setState(() => _currentPage = pageNum));
+                              }),
+                              if (totalPages > 5) ...[
+                                Text("...", style: TextStyle(color: Colors.grey.shade400)),
+                                _buildPageButton("$totalPages", _currentPage == totalPages, onTap: () => setState(() => _currentPage = totalPages)),
+                              ],
+                              // Next button
+                              _buildPageButton(">", false, onTap: _currentPage < totalPages ? () => setState(() => _currentPage++) : null),
                             ],
                           ),
                         ],
@@ -295,14 +398,38 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
     );
   }
 
+  Widget _buildPageButton(String label, bool isActive, {VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.primaryBlue : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: isActive ? null : Border.all(color: Colors.grey.shade300),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: isActive ? Colors.white : onTap == null ? Colors.grey.shade400 : Colors.grey.shade700,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatCard({
     required IconData icon,
     required Color iconBgColor,
     required Color iconColor,
     required String label,
     required String value,
-    required String badge,
-    required Color badgeColor,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -345,18 +472,6 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                     color: Color(0xFF1E293B),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (badge.startsWith('+'))
-                      Icon(Icons.trending_up, size: 14, color: badgeColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      badge,
-                      style: TextStyle(fontSize: 12, color: badgeColor),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -365,18 +480,51 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
     );
   }
 
-  Widget _buildFilterDropdown(String label) {
+  Widget _buildDeptDropdown() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade300),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
-          const SizedBox(width: 8),
-          Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+          Text("Dept: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedDept,
+              icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              items: _deptList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) => setState(() => _selectedDept = v!),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text("Status: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedStatus,
+              icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              items: _statusList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) => setState(() => _selectedStatus = v!),
+            ),
+          ),
         ],
       ),
     );
@@ -399,7 +547,7 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
   }
 
   Widget _buildEmployeeRow(BuildContext context, dynamic emp, int index, EmployeeProvider data) {
-    final daysWorked = DateTime.now().difference(emp.tglMulai).inDays;
+    final daysWorked = DateTime.now().difference(emp.tglMasuk).inDays;
     final years = daysWorked ~/ 365;
     final months = (daysWorked % 365) ~/ 30;
     final durationText = years > 0 ? "$years Thn $months Bln" : "$months Bulan";
@@ -408,25 +556,21 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
     String statusText;
     Color statusColor;
     Color statusBgColor;
-    String? actionBadge;
-    Color? actionBadgeColor;
     
     if (daysLeft <= 0) {
       statusText = "Expired";
       statusColor = const Color(0xFFEF4444);
       statusBgColor = const Color(0xFFFEE2E2);
     } else if (daysLeft <= 14) {
-      statusText = "Habis $daysLeft Hari";
+      statusText = "Segera Habis";
       statusColor = const Color(0xFFF59E0B);
       statusBgColor = const Color(0xFFFEF3C7);
-      actionBadge = "Perpanjang";
-      actionBadgeColor = const Color(0xFF22C55E);
     } else if (daysLeft <= 30) {
       statusText = "Perlu Evaluasi";
       statusColor = const Color(0xFF8B5CF6);
       statusBgColor = const Color(0xFFF3E8FF);
     } else {
-      statusText = "Aktif (PKWTT)";
+      statusText = "Aktif";
       statusColor = const Color(0xFF22C55E);
       statusBgColor = const Color(0xFFD1FAE5);
     }
@@ -466,7 +610,7 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                       ),
                     ),
                     Text(
-                      emp.email.contains('@') ? emp.email.split('@')[0] : "Staff",
+                      emp.posisi,
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                     ),
                   ],
@@ -486,19 +630,35 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
           Expanded(
             flex: 1,
             child: Text(
-              _getDepartment(index),
+              emp.departemen,
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
             ),
           ),
-          // Duration
+          // Masa Kerja
+          Expanded(
+            flex: 1,
+            child: Text(
+              emp.masaKerja,
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
+          ),
+          // Sisa Kontrak
           Expanded(
             flex: 1,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(durationText, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
                 Text(
-                  "Sejak ${DateFormat('MMM yyyy').format(emp.tglMulai)}",
+                  daysLeft <= 0 ? "Expired" : "$daysLeft hari", 
+                  style: TextStyle(
+                    fontSize: 13, 
+                    fontWeight: FontWeight.w600,
+                    color: daysLeft <= 0 ? const Color(0xFFEF4444) : 
+                           daysLeft <= 30 ? const Color(0xFFF59E0B) : Colors.grey.shade700,
+                  ),
+                ),
+                Text(
+                  "Berakhir ${DateFormat('dd MMM yyyy').format(emp.tglPkwtBerakhir)}",
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
                 ),
               ],
@@ -506,7 +666,7 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
           ),
           // Status
           Expanded(
-            flex: 2,
+            flex: 1,
             child: Row(
               children: [
                 Container(
@@ -520,20 +680,6 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: statusColor),
                   ),
                 ),
-                if (actionBadge != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: actionBadgeColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      actionBadge,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -543,25 +689,79 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  onPressed: () => _showDetailDialog(context, emp, data),
-                  icon: Icon(Icons.visibility_outlined, size: 18, color: Colors.grey.shade500),
-                  tooltip: "Lihat Detail",
-                ),
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, size: 18, color: Colors.grey.shade500),
-                  onSelected: (value) {
-                    if (value == 'evaluate') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (ctx) => EvaluationFormScreen(employee: emp)),
-                      );
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                    const PopupMenuItem(value: 'evaluate', child: Text('Evaluasi')),
-                    const PopupMenuItem(value: 'delete', child: Text('Hapus')),
-                  ],
+                // Modern Popup Menu
+                Theme(
+                  data: Theme.of(context).copyWith(
+                    useMaterial3: true,
+                    popupMenuTheme: PopupMenuThemeData(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 3,
+                      surfaceTintColor: Colors.white,
+                    ),
+                  ),
+                  child: PopupMenuButton<String>(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Icon(Icons.more_horiz, size: 20, color: Colors.grey.shade600),
+                    ),
+                    splashRadius: 24,
+                    offset: const Offset(0, 40),
+                    onSelected: (value) {
+                      if (value == 'detail') {
+                        widget.onViewDetail?.call(emp);
+                      } else if (value == 'evaluate') {
+                        widget.onEvaluasi?.call(emp);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'detail',
+                        child: Row(
+                          children: [
+                            Icon(Icons.visibility_outlined, size: 18, color: AppColors.primaryBlue),
+                            const SizedBox(width: 12),
+                            Text('Lihat Detail', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18, color: Colors.grey.shade700),
+                            const SizedBox(width: 12),
+                            Text('Edit', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'evaluate',
+                        child: Row(
+                          children: [
+                            Icon(Icons.assignment_turned_in_outlined, size: 18, color: Colors.grey.shade700),
+                            const SizedBox(width: 12),
+                            Text('Evaluasi', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(height: 1),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                            const SizedBox(width: 12),
+                            const Text('Hapus', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -585,30 +785,6 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
   String _getDepartment(int index) {
     final depts = ["IT Dept.", "Human Resources", "Sales & Marketing", "Product Design", "Finance"];
     return depts[index % depts.length];
-  }
-
-  Widget _buildPageButton(String label, bool isActive) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      child: Material(
-        color: isActive ? AppColors.primaryBlue : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(6),
-          onTap: () {},
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isActive ? Colors.white : Colors.grey.shade600,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   void _showDetailDialog(BuildContext context, dynamic e, EmployeeProvider data) {
@@ -661,12 +837,15 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
               ],
             ),
             const SizedBox(height: 24),
-            _buildInfoRow(Icons.phone_rounded, "Telepon", e.noHp),
-            _buildInfoRow(Icons.home_rounded, "Alamat", e.alamat),
+            _buildInfoRow(Icons.work_rounded, "Posisi", e.posisi),
+            _buildInfoRow(Icons.business_rounded, "Departemen", e.departemen),
+            _buildInfoRow(Icons.supervisor_account_rounded, "Atasan", e.atasanLangsung),
             const Divider(height: 32),
-            _buildInfoRow(Icons.calendar_today_rounded, "Mulai Kerja", DateFormat('dd MMMM yyyy').format(e.tglMulai)),
-            _buildInfoRow(Icons.event_rounded, "Berakhir", DateFormat('dd MMMM yyyy').format(e.tglSelesai)),
+            _buildInfoRow(Icons.calendar_today_rounded, "Mulai Kerja", DateFormat('dd MMMM yyyy').format(e.tglMasuk)),
+            _buildInfoRow(Icons.event_rounded, "PKWT Berakhir", DateFormat('dd MMMM yyyy').format(e.tglPkwtBerakhir)),
+            _buildInfoRow(Icons.description_rounded, "PKWT Ke-", "${e.pkwtKe}"),
             _buildInfoRow(Icons.timelapse_rounded, "Sisa Kontrak", "${e.hariMenujuExpired} hari"),
+            _buildInfoRow(Icons.work_history_rounded, "Masa Kerja", e.masaKerja),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,

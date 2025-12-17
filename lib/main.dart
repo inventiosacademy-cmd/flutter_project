@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'providers/auth_provider.dart';
-import 'providers/employee_provider.dart';
-import 'screens/login_screen.dart';
-import 'screens/main_screen.dart';
-import 'theme/app_theme.dart';
+import 'providers/prov_auth.dart';
+import 'providers/prov_karyawan.dart';
+import 'screens/layar_login.dart';
+import 'screens/layar_utama.dart';
+import 'theme/tema.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

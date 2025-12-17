@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
-import '../theme/app_colors.dart';
-import 'dashboard_content.dart';
-import 'employee_list_content.dart';
+import '../models/karyawan.dart';
+import '../providers/prov_auth.dart';
+import '../theme/warna.dart';
+import 'konten_daftar.dart';
+import 'konten_tambah_karyawan.dart';
+import 'konten_detail_karyawan.dart';
+import 'form_evaluasi.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -14,28 +17,91 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
-  final List<Widget> _screens = [
-    const DashboardContent(),
-    const EmployeeListContent(),
-  ];
+  bool _showDetailKaryawan = false;
+  Employee? _detailEmployee;
+  
+  // Missing variables restored
+  bool _showTambahKaryawan = false;
+  bool _showEvaluasi = false;
+  Employee? _evaluasiEmployee;
 
   void _onMenuTap(int index) {
-    if (index < _screens.length) {
-      setState(() {
+    setState(() {
+      _showTambahKaryawan = false;
+      _showEvaluasi = false;
+      _showDetailKaryawan = false;
+      _detailEmployee = null;
+      _evaluasiEmployee = null;
+      if (index == 0) {
         _selectedIndex = index;
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            index == 2 ? 'Fitur Evaluasi segera hadir' : 
-            index == 3 ? 'Fitur Manajemen PKWT segera hadir' :
-            'Fitur Pengaturan segera hadir'
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              index == 1 ? 'Fitur Evaluasi segera hadir' : 
+              index == 2 ? 'Fitur Manajemen PKWT segera hadir' :
+              'Fitur Pengaturan segera hadir'
+            ),
           ),
-        ),
-      );
+        );
+      }
+    });
+  }
+
+  void _navigateToTambahKaryawan() {
+    setState(() {
+      _showTambahKaryawan = true;
+      _showEvaluasi = false;
+      _showDetailKaryawan = false;
+    });
+  }
+
+  void _navigateToEvaluasi(Employee employee) {
+    setState(() {
+      _showEvaluasi = true;
+      _showTambahKaryawan = false;
+      _showDetailKaryawan = false;
+      _evaluasiEmployee = employee;
+    });
+  }
+
+  void _navigateToDetail(Employee employee) {
+    setState(() {
+      _showDetailKaryawan = true;
+      _showTambahKaryawan = false;
+      _showEvaluasi = false;
+      _detailEmployee = employee;
+    });
+  }
+
+  void _navigateBack() {
+    setState(() {
+      _showTambahKaryawan = false;
+      _showEvaluasi = false;
+      _showDetailKaryawan = false;
+      _evaluasiEmployee = null;
+      _detailEmployee = null;
+    });
+  }
+
+  Widget _buildContent() {
+    if (_showTambahKaryawan) {
+      return KontenTambahKaryawan(onBack: _navigateBack);
     }
+    
+    if (_showEvaluasi && _evaluasiEmployee != null) {
+      return KontenEvaluasi(employee: _evaluasiEmployee!, onBack: _navigateBack);
+    }
+    
+    if (_showDetailKaryawan && _detailEmployee != null) {
+      return KontenDetailKaryawan(employee: _detailEmployee!, onBack: _navigateBack);
+    }
+    
+    return EmployeeListContent(
+      onTambahKaryawan: _navigateToTambahKaryawan,
+      onEvaluasi: _navigateToEvaluasi,
+      onViewDetail: _navigateToDetail,
+    );
   }
 
   @override
@@ -46,9 +112,9 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           // Permanent Sidebar
           _buildSidebar(),
-          // Main Content (no top bar)
+          // Main Content
           Expanded(
-            child: _screens[_selectedIndex],
+            child: _buildContent(),
           ),
         ],
       ),
@@ -124,34 +190,28 @@ class _MainScreenState extends State<MainScreen> {
               child: Column(
                 children: [
                   _buildMenuItem(
-                    icon: Icons.dashboard_outlined,
-                    activeIcon: Icons.dashboard,
-                    label: 'Dashboard',
-                    index: 0,
-                  ),
-                  _buildMenuItem(
                     icon: Icons.people_outline,
                     activeIcon: Icons.people,
                     label: 'Data Karyawan',
-                    index: 1,
+                    index: 0,
                   ),
                   _buildMenuItem(
                     icon: Icons.assignment_outlined,
                     activeIcon: Icons.assignment,
                     label: 'Evaluasi',
-                    index: 2,
+                    index: 1,
                   ),
                   _buildMenuItem(
                     icon: Icons.description_outlined,
                     activeIcon: Icons.description,
                     label: 'Manajemen PKWT',
-                    index: 3,
+                    index: 2,
                   ),
                   _buildMenuItem(
                     icon: Icons.settings_outlined,
                     activeIcon: Icons.settings,
                     label: 'Pengaturan',
-                    index: 4,
+                    index: 3,
                   ),
                 ],
               ),
@@ -174,7 +234,7 @@ class _MainScreenState extends State<MainScreen> {
     required String label,
     required int index,
   }) {
-    final isActive = _selectedIndex == index;
+    final isActive = !_showTambahKaryawan && !_showEvaluasi && _selectedIndex == index;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),

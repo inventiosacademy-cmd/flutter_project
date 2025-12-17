@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
+import 'warna.dart';
 
 /// App theme configuration for HR Dashboard
 class AppTheme {

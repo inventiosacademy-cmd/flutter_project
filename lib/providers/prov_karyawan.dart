@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/employee.dart';
-import '../models/evaluation.dart';
+import '../models/karyawan.dart';
+import '../models/evaluasi.dart';
 
 class EmployeeProvider with ChangeNotifier {
   final List<Employee> _employees = [];
