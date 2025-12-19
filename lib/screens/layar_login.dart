@@ -55,20 +55,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       _isLoading = true;
     });
 
-    // Simulate network delay for better UX
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final success = await Provider.of<AuthProvider>(context, listen: false)
+    final errorMessage = await Provider.of<AuthProvider>(context, listen: false)
         .login(_usernameController.text, _passwordController.text);
 
-    if (!success) {
+    if (errorMessage != null) {
       if (mounted) {
         setState(() {
-          _errorMessage = "Username atau Password salah.";
+          _errorMessage = errorMessage;
           _isLoading = false;
         });
       }
     }
+    // If null, success -> AuthProvider listener will trigger rebuild in main.dart to switch screens
   }
 
   @override
@@ -142,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   controller: _usernameController,
                                   style: const TextStyle(color: Color(0xFF1E3A8A)),
                                   decoration: InputDecoration(
-                                    hintText: "Username",
+                                    hintText: "Email",
                                     hintStyle: TextStyle(color: Colors.grey.shade500),
                                     prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.grey.shade600),
                                     filled: true,

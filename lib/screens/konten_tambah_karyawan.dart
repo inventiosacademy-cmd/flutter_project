@@ -8,8 +8,9 @@ import '../theme/warna.dart';
 
 class KontenTambahKaryawan extends StatefulWidget {
   final VoidCallback onBack;
+  final Employee? employeeToEdit;
   
-  const KontenTambahKaryawan({super.key, required this.onBack});
+  const KontenTambahKaryawan({super.key, required this.onBack, this.employeeToEdit});
 
   @override
   State<KontenTambahKaryawan> createState() => _KontenTambahKaryawanState();
@@ -18,16 +19,31 @@ class KontenTambahKaryawan extends StatefulWidget {
 class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
   final _formKey = GlobalKey<FormState>();
   
-  final _namaController = TextEditingController();
-  final _posisiController = TextEditingController();
-  final _atasanController = TextEditingController();
-  final _pkwtKeController = TextEditingController(text: '1');
-  
+  late TextEditingController _namaController;
+  late TextEditingController _posisiController;
+  late TextEditingController _atasanController;
+  late TextEditingController _pkwtKeController;
   
   String _departemen = 'IT';
   DateTime? _tglMasuk;
   DateTime? _tglPkwtBerakhir;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.employeeToEdit;
+    _namaController = TextEditingController(text: e?.nama ?? '');
+    _posisiController = TextEditingController(text: e?.posisi ?? '');
+    _atasanController = TextEditingController(text: e?.atasanLangsung ?? '');
+    _pkwtKeController = TextEditingController(text: e?.pkwtKe.toString() ?? '1');
+    
+    if (e != null) {
+      _departemen = e.departemen;
+      _tglMasuk = e.tglMasuk;
+      _tglPkwtBerakhir = e.tglPkwtBerakhir;
+    }
+  }
 
   final List<String> _departemenList = [
     'IT',
@@ -64,7 +80,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
       await Future.delayed(const Duration(milliseconds: 500));
 
       final newEmployee = Employee(
-        id: const Uuid().v4(),
+        id: widget.employeeToEdit?.id ?? const Uuid().v4(), // Use existing ID if editing
         nama: _namaController.text,
         posisi: _posisiController.text,
         departemen: _departemen,
@@ -75,24 +91,45 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
       );
 
       if (mounted) {
-        Provider.of<EmployeeProvider>(context, listen: false).addEmployee(newEmployee);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Data karyawan berhasil disimpan'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-        
-        widget.onBack();
+        try {
+          final provider = Provider.of<EmployeeProvider>(context, listen: false);
+          if (widget.employeeToEdit != null) {
+            await provider.updateEmployee(newEmployee);
+          } else {
+            await provider.addEmployee(newEmployee);
+          }
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Text(widget.employeeToEdit != null ? 'Data berhasil diperbarui' : 'Data karyawan berhasil disimpan'),
+                  ],
+                ),
+                backgroundColor: AppColors.success,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            );
+            
+            widget.onBack();
+          }
+        } catch (e) {
+           if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Gagal menyimpan data: $e'),
+                backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            );
+            setState(() => _isLoading = false);
+           }
+        }
       }
     }
   }
@@ -160,21 +197,21 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "Tambah Karyawan Baru",
-                      style: TextStyle(
+                      widget.employeeToEdit != null ? "Edit Data Karyawan" : "Tambah Karyawan Baru",
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E293B),
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      "Isi data karyawan dan informasi kontrak PKWT",
-                      style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                      widget.employeeToEdit != null ? "Perbarui informasi data karyawan" : "Isi data karyawan dan informasi kontrak PKWT",
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -191,7 +228,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                 children: [
                   // Data Karyawan Section
                   _buildSection(
-                    title: "Data Karyawan",
+                    title: "Dashboard",
                     icon: Icons.person_rounded,
                     children: [
                       _buildTextField(_namaController, 'Nama Lengkap', Icons.badge_rounded),
@@ -246,12 +283,12 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                               width: 20, height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Row(
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.save_rounded, size: 20),
-                                SizedBox(width: 8),
-                                Text("Simpan Data", style: TextStyle(fontWeight: FontWeight.w600)),
+                                const Icon(Icons.save_rounded, size: 20),
+                                const SizedBox(width: 8),
+                                Text(widget.employeeToEdit != null ? "Simpan Perubahan" : "Simpan Data", style: const TextStyle(fontWeight: FontWeight.w600)),
                               ],
                             ),
                     ),

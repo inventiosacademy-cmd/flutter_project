@@ -2,26 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/prov_karyawan.dart';
+import '../providers/prov_evaluasi.dart';
 import '../models/karyawan.dart';
 import '../theme/warna.dart';
 
-class EmployeeListContent extends StatefulWidget {
+class DashboardContent extends StatefulWidget {
   final VoidCallback? onTambahKaryawan;
   final Function(Employee)? onEvaluasi;
   final Function(Employee)? onViewDetail;
+  final Function(Employee)? onEdit;
   
-  const EmployeeListContent({
+  const DashboardContent({
     super.key, 
     this.onTambahKaryawan, 
     this.onEvaluasi,
     this.onViewDetail,
+    this.onEdit,
   });
 
   @override
-  State<EmployeeListContent> createState() => _EmployeeListContentState();
+  State<DashboardContent> createState() => _DashboardContentState();
 }
 
-class _EmployeeListContentState extends State<EmployeeListContent> {
+class _DashboardContentState extends State<DashboardContent> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   
@@ -35,6 +38,9 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
   
   final List<String> _deptList = ['Semua', 'IT', 'Human Resources', 'Finance', 'Marketing', 'Sales', 'Operations', 'Product', 'Legal'];
   final List<String> _statusList = ['Semua', 'Aktif', 'Segera Habis', 'Expired'];
+  final List<String> _evaluasiList = ['Semua', 'Sudah Evaluasi', 'Belum Evaluasi', 'Perlu Evaluasi'];
+
+  String _selectedEvaluasi = 'Semua';
 
   @override
   void dispose() {
@@ -59,7 +65,7 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      "Daftar Karyawan",
+                      "Dashboard",
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -89,6 +95,10 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.normal,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -102,6 +112,10 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.normal,
                         ),
                       ),
                     ),
@@ -206,6 +220,8 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                       _buildDeptDropdown(),
                       const SizedBox(width: 12),
                       _buildStatusDropdown(),
+                      const SizedBox(width: 12),
+                      _buildEvaluasiDropdown(),
                     ],
                   ),
 
@@ -225,15 +241,16 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                         _buildTableHeader("DEPARTEMEN", flex: 1),
                         _buildTableHeader("MASA KERJA", flex: 1),
                         _buildTableHeader("SISA KONTRAK", flex: 1),
-                        _buildTableHeader("STATUS", flex: 1),
+                        _buildTableHeader("STATUS", center: true),
+                        _buildTableHeader("EVALUASI", center: true),
                         _buildTableHeader("AKSI", flex: 1, center: true),
                       ],
                     ),
                   ),
 
                   // Table Content
-                  Consumer<EmployeeProvider>(
-                    builder: (context, data, _) {
+                  Consumer2<EmployeeProvider, EvaluasiProvider>(
+                    builder: (context, data, evaluasiProvider, _) {
                       var employees = data.employees
                           .where((e) => e.nama.toLowerCase().contains(_searchQuery) ||
                                        e.email.toLowerCase().contains(_searchQuery))
@@ -252,6 +269,32 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                           if (_selectedStatus == 'Expired') return e.hariMenujuExpired <= 0;
                           return true;
                         }).toList();
+                      }
+
+                      // Filter by evaluation
+                      if (_selectedEvaluasi != 'Semua') {
+                        employees = employees.where((e) {
+                          final hasEvaluation = evaluasiProvider.getEvaluasiByEmployee(e.id).isNotEmpty;
+                          final daysLeft = e.hariMenujuExpired;
+                          
+                          if (_selectedEvaluasi == 'Sudah Evaluasi') {
+                            return hasEvaluation;
+                          } else if (_selectedEvaluasi == 'Belum Evaluasi') {
+                            return !hasEvaluation && daysLeft >= 30;
+                          } else if (_selectedEvaluasi == 'Perlu Evaluasi') {
+                            return !hasEvaluation && daysLeft < 30;
+                          }
+                          return true;
+                        }).toList();
+                      }
+
+                      if (data.isLoading) {
+                        return Container(
+                          padding: const EdgeInsets.all(40),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
                       }
 
                       if (employees.isEmpty) {
@@ -298,8 +341,8 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                   const SizedBox(height: 16),
 
                   // Pagination
-                  Consumer<EmployeeProvider>(
-                    builder: (context, data, _) {
+                  Consumer2<EmployeeProvider, EvaluasiProvider>(
+                    builder: (context, data, evaluasiProvider, _) {
                       // Apply same filters to get correct total
                       var filteredEmployees = data.employees
                           .where((e) => e.nama.toLowerCase().contains(_searchQuery) ||
@@ -318,11 +361,25 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                           return true;
                         }).toList();
                       }
+
+                      if (_selectedEvaluasi != 'Semua') {
+                        filteredEmployees = filteredEmployees.where((e) {
+                          final hasEvaluation = evaluasiProvider.getEvaluasiByEmployee(e.id).isNotEmpty;
+                          final daysLeft = e.hariMenujuExpired;
+                          
+                          if (_selectedEvaluasi == 'Sudah Evaluasi') {
+                            return hasEvaluation;
+                          } else if (_selectedEvaluasi == 'Belum Evaluasi') {
+                            return !hasEvaluation && daysLeft >= 30;
+                          } else if (_selectedEvaluasi == 'Perlu Evaluasi') {
+                            return !hasEvaluation && daysLeft < 30;
+                          }
+                          return true;
+                        }).toList();
+                      }
                       
                       final totalItems = filteredEmployees.length;
                       final totalPages = totalItems == 0 ? 1 : (totalItems / _itemsPerPage).ceil();
-                      final startItem = totalItems == 0 ? 0 : ((_currentPage - 1) * _itemsPerPage) + 1;
-                      final endItem = (_currentPage * _itemsPerPage).clamp(0, totalItems);
                       
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -530,6 +587,31 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
     );
   }
 
+  Widget _buildEvaluasiDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text("Evaluasi: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedEvaluasi,
+              icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              items: _evaluasiList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) => setState(() => _selectedEvaluasi = v!),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTableHeader(String label, {int flex = 1, bool center = false}) {
     return Expanded(
       flex: flex,
@@ -548,27 +630,21 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
 
   Widget _buildEmployeeRow(BuildContext context, dynamic emp, int index, EmployeeProvider data) {
     final daysWorked = DateTime.now().difference(emp.tglMasuk).inDays;
-    final years = daysWorked ~/ 365;
-    final months = (daysWorked % 365) ~/ 30;
-    final durationText = years > 0 ? "$years Thn $months Bln" : "$months Bulan";
     final daysLeft = emp.hariMenujuExpired;
     
     String statusText;
     Color statusColor;
     Color statusBgColor;
     
+    // Contract Status Logic
     if (daysLeft <= 0) {
       statusText = "Expired";
       statusColor = const Color(0xFFEF4444);
       statusBgColor = const Color(0xFFFEE2E2);
-    } else if (daysLeft <= 14) {
-      statusText = "Segera Habis";
+    } else if (daysLeft < 30) {
+      statusText = "Segera Berakhir";
       statusColor = const Color(0xFFF59E0B);
       statusBgColor = const Color(0xFFFEF3C7);
-    } else if (daysLeft <= 30) {
-      statusText = "Perlu Evaluasi";
-      statusColor = const Color(0xFF8B5CF6);
-      statusBgColor = const Color(0xFFF3E8FF);
     } else {
       statusText = "Aktif";
       statusColor = const Color(0xFF22C55E);
@@ -666,21 +742,63 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
           ),
           // Status
           Expanded(
-            flex: 1,
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusBgColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    statusText,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: statusColor),
-                  ),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusBgColor,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ],
+                child: Text(
+                  statusText,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: statusColor),
+                ),
+              ),
+            ),
+          ),
+          // Evaluasi
+          Expanded(
+            child: Consumer<EvaluasiProvider>(
+              builder: (context, evaluasiProvider, _) {
+                final hasEvaluation = evaluasiProvider.getEvaluasiByEmployee(emp.id).isNotEmpty;
+                
+                String evalText;
+                Color evalColor;
+                Color evalBgColor;
+                
+                // Evaluation Status Logic
+                if (hasEvaluation) {
+                  evalText = "Sudah Evaluasi";
+                  evalColor = const Color(0xFF22C55E);
+                  evalBgColor = const Color(0xFFD1FAE5);
+                } else if (daysLeft < 30) {
+                  evalText = "Perlu Evaluasi";
+                  evalColor = const Color(0xFFEF4444);
+                  evalBgColor = const Color(0xFFFEE2E2);
+                } else {
+                  evalText = "Belum Evaluasi";
+                  evalColor = const Color(0xFF6B7280);
+                  evalBgColor = const Color(0xFFF3F4F6);
+                }
+                
+                return Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: evalBgColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      evalText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: evalColor,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           // Actions
@@ -716,6 +834,8 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
                         widget.onViewDetail?.call(emp);
                       } else if (value == 'evaluate') {
                         widget.onEvaluasi?.call(emp);
+                      } else if (value == 'edit') {
+                        widget.onEdit?.call(emp);
                       }
                     },
                     itemBuilder: (context) => [
@@ -780,104 +900,5 @@ class _EmployeeListContentState extends State<EmployeeListContent> {
       const Color(0xFFEF4444),
     ];
     return colors[index % colors.length];
-  }
-
-  String _getDepartment(int index) {
-    final depts = ["IT Dept.", "Human Resources", "Sales & Marketing", "Product Design", "Finance"];
-    return depts[index % depts.length];
-  }
-
-  void _showDetailDialog(BuildContext context, dynamic e, EmployeeProvider data) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: AppColors.primaryBlue,
-                  child: Text(
-                    e.nama.isNotEmpty ? e.nama[0].toUpperCase() : "?",
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(e.nama, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(e.email, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildInfoRow(Icons.work_rounded, "Posisi", e.posisi),
-            _buildInfoRow(Icons.business_rounded, "Departemen", e.departemen),
-            _buildInfoRow(Icons.supervisor_account_rounded, "Atasan", e.atasanLangsung),
-            const Divider(height: 32),
-            _buildInfoRow(Icons.calendar_today_rounded, "Mulai Kerja", DateFormat('dd MMMM yyyy').format(e.tglMasuk)),
-            _buildInfoRow(Icons.event_rounded, "PKWT Berakhir", DateFormat('dd MMMM yyyy').format(e.tglPkwtBerakhir)),
-            _buildInfoRow(Icons.description_rounded, "PKWT Ke-", "${e.pkwtKe}"),
-            _buildInfoRow(Icons.timelapse_rounded, "Sisa Kontrak", "${e.hariMenujuExpired} hari"),
-            _buildInfoRow(Icons.work_history_rounded, "Masa Kerja", e.masaKerja),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Tutup"),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey.shade500),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

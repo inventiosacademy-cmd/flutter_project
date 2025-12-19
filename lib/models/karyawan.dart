@@ -55,4 +55,30 @@ class Employee {
 
   // Getter email placeholder (untuk kompatibilitas)
   String get email => "$nama@company.com".toLowerCase().replaceAll(' ', '.');
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'nama': nama,
+      'posisi': posisi,
+      'departemen': departemen,
+      'atasanLangsung': atasanLangsung,
+      'tglMasuk': tglMasuk.toIso8601String().split('T').first,
+      'tglPkwtBerakhir': tglPkwtBerakhir.toIso8601String().split('T').first,
+      'pkwtKe': pkwtKe,
+    };
+  }
+
+  factory Employee.fromMap(Map<String, dynamic> map) {
+    return Employee(
+      id: map['id'] ?? '',
+      nama: map['nama'] ?? '',
+      posisi: map['posisi'] ?? '',
+      departemen: map['departemen'] ?? '',
+      atasanLangsung: map['atasanLangsung'] ?? '',
+      tglMasuk: DateTime.tryParse(map['tglMasuk'] ?? '') ?? DateTime.now(),
+      tglPkwtBerakhir: DateTime.tryParse(map['tglPkwtBerakhir'] ?? '') ?? DateTime.now(),
+      pkwtKe: map['pkwtKe'] ?? 1,
+    );
+  }
 }

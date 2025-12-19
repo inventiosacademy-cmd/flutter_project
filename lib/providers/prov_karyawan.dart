@@ -1,44 +1,108 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/karyawan.dart';
-import '../models/evaluasi.dart';
 
 class EmployeeProvider with ChangeNotifier {
-  final List<Employee> _employees = [];
-  final Map<String, List<Evaluation>> _evaluations = {};
+  List<Employee> _employees = [];
+  bool _isLoading = true;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  StreamSubscription? _employeeSubscription;
+  String? _userId;
 
-  List<Employee> get employees => [..._employees]; // Return copy
-
-  List<Evaluation> get evaluations {
-    return _evaluations.values.expand((list) => list).toList();
+  EmployeeProvider() {
+    // Listen to Auth state to handle login/logout
+    _auth.authStateChanges().listen((User? user) {
+      _employeeSubscription?.cancel();
+      
+      if (user != null) {
+        _userId = user.uid;
+        _initRealtimeUpdates(user.uid);
+      } else {
+        _userId = null;
+        _employees = [];
+        _isLoading = false;
+        notifyListeners();
+      }
+    });
   }
+
+  void _initRealtimeUpdates(String userId) {
+    _isLoading = true;
+    notifyListeners();
+
+    _employeeSubscription = _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('employees')
+        .orderBy('tglMasuk', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _employees = snapshot.docs.map((doc) {
+        return Employee.fromMap(doc.data());
+      }).toList();
+      _isLoading = false;
+      notifyListeners();
+    }, onError: (e) {
+      debugPrint("Error fetching employees: $e");
+      _isLoading = false;
+      notifyListeners();
+    });
+  }
+
+  List<Employee> get employees => [..._employees];
+  bool get isLoading => _isLoading;
 
   List<Employee> get expiringContracts {
     return _employees.where((e) {
       final days = e.hariMenujuExpired;
-      return days >= 0 && days < 30; // Notifikasi jika kurang dari 30 hari tapi belum expired
+      return days >= 0 && days < 30;
     }).toList();
   }
 
-  void addEmployee(Employee employee) {
-    _employees.add(employee);
-    notifyListeners();
-  }
-
-  void deleteEmployee(String id) {
-    _employees.removeWhere((element) => element.id == id);
-    _evaluations.remove(id); // Remove associated evaluations
-    notifyListeners();
-  }
-
-  void addEvaluation(Evaluation evaluation) {
-    if (!_evaluations.containsKey(evaluation.employeeId)) {
-      _evaluations[evaluation.employeeId] = [];
+  Future<void> addEmployee(Employee employee) async {
+    if (_userId == null) return;
+    try {
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('employees')
+          .doc(employee.id)
+          .set(employee.toMap());
+    } catch (e) {
+      debugPrint("Error adding employee: $e");
+      rethrow;
     }
-    _evaluations[evaluation.employeeId]!.add(evaluation);
-    notifyListeners();
   }
 
-  List<Evaluation> getEvaluations(String employeeId) {
-    return _evaluations[employeeId] ?? [];
+  Future<void> updateEmployee(Employee employee) async {
+    if (_userId == null) return;
+    try {
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('employees')
+          .doc(employee.id)
+          .update(employee.toMap());
+    } catch (e) {
+      debugPrint("Error updating employee: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> deleteEmployee(String id) async {
+    if (_userId == null) return;
+    try {
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('employees')
+          .doc(id)
+          .delete();
+    } catch (e) {
+      debugPrint("Error deleting employee: $e");
+    }
   }
 }

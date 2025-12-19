@@ -3,12 +3,31 @@ import 'package:provider/provider.dart';
 
 import 'providers/prov_auth.dart';
 import 'providers/prov_karyawan.dart';
+import 'providers/prov_evaluasi.dart';
 import 'screens/layar_login.dart';
 import 'screens/layar_utama.dart';
 import 'theme/tema.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  // Enable offline persistence
+  try {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true, 
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED
+    );
+  } catch (e) {
+    debugPrint("Firestore persistence error: $e");
+  }
+
   runApp(const MyApp());
 }
 
@@ -21,6 +40,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => EmployeeProvider()),
+        ChangeNotifierProvider(create: (_) => EvaluasiProvider()),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {

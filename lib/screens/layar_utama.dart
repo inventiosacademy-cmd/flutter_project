@@ -1,12 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/karyawan.dart';
-import '../providers/prov_auth.dart';
+import '../providers/prov_auth.dart' as app_auth;
 import '../theme/warna.dart';
-import 'konten_daftar.dart';
+import 'konten_dashboard.dart';
 import 'konten_tambah_karyawan.dart';
 import 'konten_detail_karyawan.dart';
+import 'konten_riwayat_evaluasi.dart';
 import 'form_evaluasi.dart';
+import 'konten_pengaturan.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -23,6 +27,9 @@ class _MainScreenState extends State<MainScreen> {
   // Missing variables restored
   bool _showTambahKaryawan = false;
   bool _showEvaluasi = false;
+  bool _showRiwayatEvaluasi = false;
+  // State for Edit Mode
+  Employee? _editEmployee;
   Employee? _evaluasiEmployee;
 
   void _onMenuTap(int index) {
@@ -30,20 +37,19 @@ class _MainScreenState extends State<MainScreen> {
       _showTambahKaryawan = false;
       _showEvaluasi = false;
       _showDetailKaryawan = false;
+      _showRiwayatEvaluasi = false;
+      _editEmployee = null; // Reset
       _detailEmployee = null;
       _evaluasiEmployee = null;
+      
       if (index == 0) {
         _selectedIndex = index;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              index == 1 ? 'Fitur Evaluasi segera hadir' : 
-              index == 2 ? 'Fitur Manajemen PKWT segera hadir' :
-              'Fitur Pengaturan segera hadir'
-            ),
-          ),
-        );
+      } else if (index == 1) {
+        _showRiwayatEvaluasi = true;
+        _selectedIndex = index;
+      } else if (index == 2) {
+        // Settings
+        _selectedIndex = index;
       }
     });
   }
@@ -51,6 +57,16 @@ class _MainScreenState extends State<MainScreen> {
   void _navigateToTambahKaryawan() {
     setState(() {
       _showTambahKaryawan = true;
+      _editEmployee = null;
+      _showEvaluasi = false;
+      _showDetailKaryawan = false;
+    });
+  }
+
+  void _navigateToEditKaryawan(Employee employee) {
+    setState(() {
+      _showTambahKaryawan = true;
+      _editEmployee = employee;
       _showEvaluasi = false;
       _showDetailKaryawan = false;
     });
@@ -79,6 +95,7 @@ class _MainScreenState extends State<MainScreen> {
       _showTambahKaryawan = false;
       _showEvaluasi = false;
       _showDetailKaryawan = false;
+      _showRiwayatEvaluasi = false;
       _evaluasiEmployee = null;
       _detailEmployee = null;
     });
@@ -86,7 +103,10 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildContent() {
     if (_showTambahKaryawan) {
-      return KontenTambahKaryawan(onBack: _navigateBack);
+      return KontenTambahKaryawan(
+        onBack: _navigateBack,
+        employeeToEdit: _editEmployee,
+      );
     }
     
     if (_showEvaluasi && _evaluasiEmployee != null) {
@@ -97,10 +117,19 @@ class _MainScreenState extends State<MainScreen> {
       return KontenDetailKaryawan(employee: _detailEmployee!, onBack: _navigateBack);
     }
     
-    return EmployeeListContent(
+    if (_showRiwayatEvaluasi) {
+      return KontenRiwayatEvaluasi(onBuatEvaluasi: _navigateToTambahKaryawan);
+    }
+
+    if (_selectedIndex == 2) {
+      return const SettingsContent();
+    }
+    
+    return DashboardContent(
       onTambahKaryawan: _navigateToTambahKaryawan,
       onEvaluasi: _navigateToEvaluasi,
       onViewDetail: _navigateToDetail,
+      onEdit: _navigateToEditKaryawan,
     );
   }
 
@@ -109,6 +138,7 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Permanent Sidebar
           _buildSidebar(),
@@ -132,51 +162,64 @@ class _MainScreenState extends State<MainScreen> {
       ),
       child: Column(
         children: [
-          // User Info
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.primaryBlue,
-                    child: const Text(
-                      "B",
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
+          // User Info (Real-time from Provider)
+          Consumer<app_auth.AuthProvider>(
+            builder: (context, authProvider, _) {
+              final displayName = authProvider.displayName;
+              final jobTitle = authProvider.jobTitle;
+              final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+
+              return Container(
+                padding: const EdgeInsets.all(20),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Budi Santoso",
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E293B),
-                          ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppColors.primaryBlue,
+                        child: Text(
+                          initial,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
-                        Text(
-                          "HR Manager",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF94A3B8),
-                          ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              jobTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
 
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
@@ -192,37 +235,28 @@ class _MainScreenState extends State<MainScreen> {
                   _buildMenuItem(
                     icon: Icons.people_outline,
                     activeIcon: Icons.people,
-                    label: 'Data Karyawan',
+                    label: 'Dashboard',
                     index: 0,
                   ),
                   _buildMenuItem(
                     icon: Icons.assignment_outlined,
                     activeIcon: Icons.assignment,
-                    label: 'Evaluasi',
+                    label: 'Riwayat Evaluasi',
                     index: 1,
-                  ),
-                  _buildMenuItem(
-                    icon: Icons.description_outlined,
-                    activeIcon: Icons.description,
-                    label: 'Manajemen PKWT',
-                    index: 2,
                   ),
                   _buildMenuItem(
                     icon: Icons.settings_outlined,
                     activeIcon: Icons.settings,
                     label: 'Pengaturan',
-                    index: 3,
+                    index: 2,
                   ),
                 ],
               ),
             ),
           ),
 
-          // Logout Section
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: _buildLogoutButton(),
-          ),
+          // Logout Section removed as requested
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -234,7 +268,7 @@ class _MainScreenState extends State<MainScreen> {
     required String label,
     required int index,
   }) {
-    final isActive = !_showTambahKaryawan && !_showEvaluasi && _selectedIndex == index;
+    final isActive = !_showTambahKaryawan && !_showEvaluasi && !_showDetailKaryawan && _selectedIndex == index;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -270,33 +304,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildLogoutButton() {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () => _showLogoutDialog(),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Icon(Icons.logout_outlined, color: Colors.grey.shade600, size: 20),
-              const SizedBox(width: 12),
-              Text(
-                'Keluar',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+
 
   void _showLogoutDialog() {
     showDialog(
@@ -325,7 +333,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              Provider.of<AuthProvider>(context, listen: false).logout();
+              Provider.of<app_auth.AuthProvider>(context, listen: false).logout();
             },
             child: const Text("Keluar"),
           ),

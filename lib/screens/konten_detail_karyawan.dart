@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/karyawan.dart';
+import '../providers/prov_karyawan.dart';
 import '../theme/warna.dart';
 
 class KontenDetailKaryawan extends StatefulWidget {
@@ -110,7 +112,15 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                         color: const Color(0xFFE2E8F0),
                       ),
                       const SizedBox(height: 28),
-                      _buildLeftPanelItem("Person ID", widget.employee.id),
+                      Consumer<EmployeeProvider>(
+                        builder: (context, provider, _) {
+                          final index = provider.employees.indexWhere((e) => e.id == widget.employee.id);
+                          final displayId = index != -1 
+                              ? "EMP-${DateTime.now().year}-${(index + 1).toString().padLeft(3, '0')}"
+                              : widget.employee.id;
+                          return _buildLeftPanelItem("ID Karyawan", displayId);
+                        },
+                      ),
                       const SizedBox(height: 24),
                       _buildLeftPanelItem("Masa Kerja", widget.employee.masaKerja),
                     ],
@@ -138,11 +148,13 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                         ),
                         
                         // Content
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(48, 40, 48, 40),
-                          child: _selectedTab == 0
-                              ? _buildProfileContent()
-                              : _buildEvaluasiContent(),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(48),
+                            child: _selectedTab == 0
+                                ? _buildProfileContent()
+                                : _buildEvaluasiContent(),
+                          ),
                         ),
                       ],
                     ),
@@ -219,44 +231,21 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Personal Employment Header
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.work_outline,
-                size: 20,
-                color: AppColors.primaryBlue,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              "Informasi Pekerjaan",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
         
-        // Employment Details Grid
-        Wrap(
-          spacing: 40,
-          runSpacing: 28,
+        // Employment Details - Vertical Layout
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetailItem("Departemen", widget.employee.departemen),
+            const SizedBox(height: 24),
             _buildDetailItem("Posisi", widget.employee.posisi),
+            const SizedBox(height: 24),
             _buildDetailItem("Atasan Langsung", widget.employee.atasanLangsung),
+            const SizedBox(height: 24),
             _buildDetailItem("Tanggal Masuk", DateFormat('dd MMMM yyyy').format(widget.employee.tglMasuk)),
+            const SizedBox(height: 24),
             _buildDetailItem("Akhir Kontrak", DateFormat('dd MMMM yyyy').format(widget.employee.tglPkwtBerakhir)),
+            const SizedBox(height: 24),
             _buildDetailItem("Status PKWT", "PKWT Ke-${widget.employee.pkwtKe}"),
           ],
         ),
@@ -265,32 +254,29 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
   }
 
   Widget _buildDetailItem(String label, String value) {
-    return SizedBox(
-      width: 240,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade500,
-              letterSpacing: 0.8,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade500,
+            letterSpacing: 0.8,
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1E293B),
-              height: 1.4,
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1E293B),
+            height: 1.4,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

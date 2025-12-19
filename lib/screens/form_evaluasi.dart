@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../models/karyawan.dart';
 import '../models/evaluasi.dart';
 import '../providers/prov_karyawan.dart';
+import '../providers/prov_evaluasi.dart';
 import '../theme/warna.dart';
 
 class KontenEvaluasi extends StatefulWidget {
@@ -46,6 +47,7 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
   String _recommendation = 'perpanjang';
   int _perpanjangBulan = 6;
   final _notesController = TextEditingController();
+  final _periodeController = TextEditingController();
   
   @override
   void initState() {
@@ -56,11 +58,16 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       _ratings[i] = null;
       _comments[i] = TextEditingController();
     }
+    // Set default periode
+    final now = DateTime.now();
+    final quarter = ((now.month - 1) ~/ 3) + 1;
+    _periodeController.text = 'Q$quarter ${now.year}';
   }
   
   @override
   void dispose() {
     _notesController.dispose();
+    _periodeController.dispose();
     for (var c in _comments.values) {
       c.dispose();
     }
@@ -91,6 +98,17 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
   String get _status {
     if (_totalFaktor == 0) return '-';
     return _nilaiRataRata >= 3 ? 'LULUS' : 'TIDAK LULUS';
+  }
+  
+  String _convertToGrade(double average) {
+    if (average >= 4.5) return 'A';
+    if (average >= 4.0) return 'A-';
+    if (average >= 3.5) return 'B+';
+    if (average >= 3.0) return 'B';
+    if (average >= 2.5) return 'C+';
+    if (average >= 2.0) return 'C';
+    if (average >= 1.5) return 'D';
+    return 'E';
   }
   
   void _submit() async {
@@ -124,16 +142,29 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 500));
     
-    final ev = Evaluation(
+    // Build catatan from comments
+    String fullCatatan = _notesController.text;
+    if (fullCatatan.isEmpty) {
+      fullCatatan = 'Evaluasi kinerja karyawan periode ${_periodeController.text}';
+    }
+    
+    final evaluasi = Evaluasi(
       id: const Uuid().v4(),
       employeeId: widget.employee.id,
-      date: DateTime.now(),
-      notes: _notesController.text,
-      score: _nilaiRataRata,
+      employeeName: widget.employee.nama,
+      employeePosition: widget.employee.posisi,
+      tanggalEvaluasi: DateTime.now(),
+      periode: _periodeController.text,
+      nilaiKinerja: _convertToGrade(_nilaiRataRata),
+      catatan: fullCatatan,
+      status: EvaluasiStatus.belumTTD, // Default status
+      evaluator: 'Budi Santoso', // TODO: Get from auth
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
 
     if (mounted) {
-      Provider.of<EmployeeProvider>(context, listen: false).addEvaluation(ev);
+      Provider.of<EvaluasiProvider>(context, listen: false).addEvaluasi(evaluasi);
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -310,6 +341,29 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
               Text(
                 DateFormat('dd MMMM yyyy').format(DateTime.now()),
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Periode Evaluasi',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: 120,
+                child: TextField(
+                  controller: _periodeController,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                  decoration: InputDecoration(
+                    hintText: 'Q1 2025',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
