@@ -43,3 +43,39 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ============================================
+# SECURITY - Sensitive files to exclude
+# ============================================
+
+# Environment files (may contain secrets)
+.env
+.env.*
+*.env
+
+# Firebase Functions
+functions/node_modules/
+functions/lib/
+functions/.env
+functions/.env.*
+
+# Temporary and cache files
+*.tmp
+*.temp
+*.cache
+
+# Log files
+*.log
+debug_*.log
+
+# Build artifacts
+HR_Dashboard_Windows.zip
+*.exe
+*.dmg
+*.app
+
+# Firebase emulator data
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

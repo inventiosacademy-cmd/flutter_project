@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/prov_evaluasi.dart';
 import '../models/evaluasi.dart';
 import '../theme/warna.dart';
+import '../services/pdf_generator.dart';
 
 class KontenRiwayatEvaluasi extends StatefulWidget {
   final VoidCallback? onBuatEvaluasi;
@@ -606,6 +607,10 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                   onSelected: (value) {
                     if (value == 'delete') {
                       _showDeleteDialog(evaluasi.id, provider);
+                    } else if (value == 'view') {
+                      _showDetailDialog(evaluasi);
+                    } else if (value == 'pdf') {
+                      _exportPdfFromEvaluasi(evaluasi);
                     }
                   },
                   itemBuilder: (context) => [
@@ -616,6 +621,16 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                           Icon(Icons.visibility_outlined, size: 18, color: AppColors.primaryBlue),
                           SizedBox(width: 12),
                           Text('Lihat Detail'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'pdf',
+                      child: Row(
+                        children: [
+                          Icon(Icons.picture_as_pdf_outlined, size: 18, color: Color(0xFFEF4444)),
+                          SizedBox(width: 12),
+                          Text('Export PDF'),
                         ],
                       ),
                     ),
@@ -722,17 +737,265 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
-              provider.deleteEvaluasi(id);
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Evaluasi berhasil dihapus")),
-              );
+              try {
+                await provider.deleteEvaluasi(id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Evaluasi berhasil dihapus dari Firestore")),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Gagal menghapus: $e"), backgroundColor: Colors.red),
+                  );
+                }
+              }
             },
             child: const Text("Hapus"),
           ),
         ],
       ),
     );
+  }
+
+  void _showDetailDialog(Evaluasi evaluasi) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.assessment_rounded, color: AppColors.primaryBlue),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: Text("Detail Evaluasi")),
+            IconButton(
+              onPressed: () => Navigator.pop(ctx),
+              icon: Icon(Icons.close, color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Employee Info
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        evaluasi.employeeName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        evaluasi.employeePosition,
+                        style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Details
+                _buildDetailRow("Periode", evaluasi.periode),
+                _buildDetailRow("Tanggal Evaluasi", DateFormat('dd MMMM yyyy').format(evaluasi.tanggalEvaluasi)),
+                _buildDetailRow("Evaluator", evaluasi.evaluator),
+                _buildDetailRow("Status", evaluasi.status.label),
+                
+                const SizedBox(height: 16),
+                
+                // Nilai
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _getNilaiColor(evaluasi.nilaiKinerja).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _getNilaiColor(evaluasi.nilaiKinerja).withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          children: [
+                            Text("Nilai Kinerja", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            const SizedBox(height: 4),
+                            Text(
+                              evaluasi.nilaiKinerja,
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: _getNilaiColor(evaluasi.nilaiKinerja),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Catatan
+                if (evaluasi.catatan.isNotEmpty) ...[
+                  const Text("Catatan:", style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      evaluasi.catatan,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Tutup"),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _exportPdfFromEvaluasi(evaluasi);
+            },
+            icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+            label: const Text("Export PDF"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          ),
+          const Text(": ", style: TextStyle(fontSize: 13)),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _exportPdfFromEvaluasi(Evaluasi evaluasi) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text("Membuat PDF..."),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Convert ratings to nullable map for EvaluasiData
+      Map<int, int?> ratingsNullable = {};
+      for (var entry in evaluasi.ratings.entries) {
+        ratingsNullable[entry.key] = entry.value;
+      }
+      
+      // Create EvaluasiData from actual stored data
+      final evaluasiData = EvaluasiData(
+        namaKaryawan: evaluasi.employeeName,
+        posisi: evaluasi.employeePosition,
+        departemen: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
+        lokasiKerja: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
+        atasanLangsung: evaluasi.atasanLangsung.isNotEmpty ? evaluasi.atasanLangsung : evaluasi.evaluator,
+        tanggalMasuk: evaluasi.tanggalMasuk,
+        tanggalPkwtBerakhir: evaluasi.tanggalPkwtBerakhir,
+        pkwtKe: evaluasi.pkwtKe,
+        tanggalEvaluasi: evaluasi.tanggalEvaluasi,
+        ratings: ratingsNullable,
+        comments: evaluasi.comments,
+        recommendation: evaluasi.recommendation,
+        perpanjangBulan: evaluasi.perpanjangBulan,
+        catatan: evaluasi.catatan,
+        namaEvaluator: evaluasi.evaluator,
+        sakit: evaluasi.sakit,
+        izin: evaluasi.izin,
+        terlambat: evaluasi.terlambat,
+        mangkir: evaluasi.mangkir,
+      );
+      
+      // Generate and show print dialog
+      await EvaluasiPdfGenerator.printPdf(evaluasiData);
+      
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white),
+                SizedBox(width: 12),
+                Text('PDF berhasil dibuat'),
+              ],
+            ),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

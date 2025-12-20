@@ -1,31 +1,165 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/evaluasi.dart';
 
 class EvaluasiProvider with ChangeNotifier {
-  final List<Evaluasi> _evaluasiList = [];
+  List<Evaluasi> _evaluasiList = [];
+  bool _isLoading = false;
+  String? _error;
 
   List<Evaluasi> get evaluasiList => [..._evaluasiList];
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  // Get current user ID
+  String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+
+  // Firestore collection reference
+  CollectionReference<Map<String, dynamic>> get _evaluasiCollection {
+    final userId = _userId;
+    if (userId == null) {
+      throw Exception('User not logged in');
+    }
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('evaluasi');
+  }
+
+  // Initialize and listen to Firestore changes
+  void init() {
+    if (_userId == null) return;
+    
+    _evaluasiCollection
+        .orderBy('tanggalEvaluasi', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _evaluasiList = snapshot.docs.map((doc) => _fromFirestore(doc)).toList();
+      notifyListeners();
+    }, onError: (e) {
+      _error = e.toString();
+      notifyListeners();
+    });
+  }
+
+  // Convert Firestore document to Evaluasi
+  Evaluasi _fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data()!;
+    return Evaluasi(
+      id: doc.id,
+      employeeId: data['employeeId'] ?? '',
+      employeeName: data['employeeName'] ?? '',
+      employeePosition: data['employeePosition'] ?? '',
+      employeeDepartemen: data['employeeDepartemen'] ?? '',
+      atasanLangsung: data['atasanLangsung'] ?? '',
+      tanggalMasuk: (data['tanggalMasuk'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      tanggalPkwtBerakhir: (data['tanggalPkwtBerakhir'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      pkwtKe: data['pkwtKe'] ?? 1,
+      tanggalEvaluasi: (data['tanggalEvaluasi'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      periode: data['periode'] ?? '',
+      nilaiKinerja: data['nilaiKinerja'] ?? '',
+      catatan: data['catatan'] ?? '',
+      status: EvaluasiStatus.values.firstWhere(
+        (e) => e.name == data['status'],
+        orElse: () => EvaluasiStatus.draft,
+      ),
+      evaluator: data['evaluator'] ?? '',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      ratings: Evaluasi.ratingsFromJson(data['ratings'] as Map<String, dynamic>?),
+      comments: Evaluasi.commentsFromJson(data['comments'] as Map<String, dynamic>?),
+      recommendation: data['recommendation'] ?? 'perpanjang',
+      perpanjangBulan: data['perpanjangBulan'] ?? 6,
+      sakit: data['sakit'] ?? 0,
+      izin: data['izin'] ?? 0,
+      terlambat: data['terlambat'] ?? 0,
+      mangkir: data['mangkir'] ?? 0,
+    );
+  }
+
+  // Convert Evaluasi to Firestore document
+  Map<String, dynamic> _toFirestore(Evaluasi evaluasi) {
+    return {
+      'employeeId': evaluasi.employeeId,
+      'employeeName': evaluasi.employeeName,
+      'employeePosition': evaluasi.employeePosition,
+      'employeeDepartemen': evaluasi.employeeDepartemen,
+      'atasanLangsung': evaluasi.atasanLangsung,
+      'tanggalMasuk': Timestamp.fromDate(evaluasi.tanggalMasuk),
+      'tanggalPkwtBerakhir': Timestamp.fromDate(evaluasi.tanggalPkwtBerakhir),
+      'pkwtKe': evaluasi.pkwtKe,
+      'tanggalEvaluasi': Timestamp.fromDate(evaluasi.tanggalEvaluasi),
+      'periode': evaluasi.periode,
+      'nilaiKinerja': evaluasi.nilaiKinerja,
+      'catatan': evaluasi.catatan,
+      'status': evaluasi.status.name,
+      'evaluator': evaluasi.evaluator,
+      'createdAt': Timestamp.fromDate(evaluasi.createdAt),
+      'updatedAt': Timestamp.fromDate(evaluasi.updatedAt),
+      'ratings': evaluasi.ratingsJson,
+      'comments': evaluasi.commentsJson,
+      'recommendation': evaluasi.recommendation,
+      'perpanjangBulan': evaluasi.perpanjangBulan,
+      'sakit': evaluasi.sakit,
+      'izin': evaluasi.izin,
+      'terlambat': evaluasi.terlambat,
+      'mangkir': evaluasi.mangkir,
+    };
+  }
 
   // Add new evaluation
-  void addEvaluasi(Evaluasi evaluasi) {
-    _evaluasiList.add(evaluasi);
-    notifyListeners();
+  Future<void> addEvaluasi(Evaluasi evaluasi) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      
+      await _evaluasiCollection.doc(evaluasi.id).set(_toFirestore(evaluasi));
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 
   // Update evaluation
-  void updateEvaluasi(String id, Evaluasi updatedEvaluasi) {
-    final index = _evaluasiList.indexWhere((e) => e.id == id);
-    if (index != -1) {
-      _evaluasiList[index] = updatedEvaluasi;
+  Future<void> updateEvaluasi(String id, Evaluasi updatedEvaluasi) async {
+    try {
+      _isLoading = true;
       notifyListeners();
+      
+      await _evaluasiCollection.doc(id).update(_toFirestore(updatedEvaluasi));
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
     }
   }
 
   // Delete evaluation
-  void deleteEvaluasi(String id) {
-    _evaluasiList.removeWhere((e) => e.id == id);
-    notifyListeners();
+  Future<void> deleteEvaluasi(String id) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      
+      await _evaluasiCollection.doc(id).delete();
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 
   // Get filtered evaluations

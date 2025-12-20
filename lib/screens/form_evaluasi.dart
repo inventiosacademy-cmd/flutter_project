@@ -7,6 +7,7 @@ import '../models/evaluasi.dart';
 import '../providers/prov_karyawan.dart';
 import '../providers/prov_evaluasi.dart';
 import '../theme/warna.dart';
+import '../services/pdf_generator.dart';
 
 class KontenEvaluasi extends StatefulWidget {
   final Employee employee;
@@ -148,40 +149,177 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       fullCatatan = 'Evaluasi kinerja karyawan periode ${_periodeController.text}';
     }
     
+    // Convert ratings to non-nullable map
+    Map<int, int> ratingsMap = {};
+    for (var entry in _ratings.entries) {
+      if (entry.value != null) {
+        ratingsMap[entry.key] = entry.value!;
+      }
+    }
+    
+    // Convert comments to map
+    Map<int, String> commentsMap = {};
+    for (var entry in _comments.entries) {
+      commentsMap[entry.key] = entry.value.text;
+    }
+    
     final evaluasi = Evaluasi(
       id: const Uuid().v4(),
       employeeId: widget.employee.id,
       employeeName: widget.employee.nama,
       employeePosition: widget.employee.posisi,
+      employeeDepartemen: widget.employee.departemen,
+      atasanLangsung: widget.employee.atasanLangsung,
+      tanggalMasuk: widget.employee.tglMasuk,
+      tanggalPkwtBerakhir: widget.employee.tglPkwtBerakhir,
+      pkwtKe: widget.employee.pkwtKe,
       tanggalEvaluasi: DateTime.now(),
       periode: _periodeController.text,
       nilaiKinerja: _convertToGrade(_nilaiRataRata),
       catatan: fullCatatan,
-      status: EvaluasiStatus.belumTTD, // Default status
-      evaluator: 'Budi Santoso', // TODO: Get from auth
+      status: EvaluasiStatus.belumTTD,
+      evaluator: 'HR Manager', // TODO: Get from auth
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      ratings: ratingsMap,
+      comments: commentsMap,
+      recommendation: _recommendation,
+      perpanjangBulan: _perpanjangBulan,
     );
 
-    if (mounted) {
-      Provider.of<EvaluasiProvider>(context, listen: false).addEvaluasi(evaluasi);
+    try {
+      await Provider.of<EvaluasiProvider>(context, listen: false).addEvaluasi(evaluasi);
       
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Evaluasi berhasil disimpan ke Firestore'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+        
+        widget.onBack();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Gagal menyimpan: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    }
+  }
+
+  void _exportPdf() async {
+    // Check if all factors have ratings
+    bool allRated = true;
+    for (var r in _ratings.values) {
+      if (r == null) {
+        allRated = false;
+        break;
+      }
+    }
+    
+    if (!allRated) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white),
+              Icon(Icons.warning_rounded, color: Colors.white),
               SizedBox(width: 12),
-              Text('Evaluasi berhasil disimpan'),
+              Text('Harap lengkapi semua penilaian sebelum export PDF'),
             ],
           ),
-          backgroundColor: AppColors.success,
+          backgroundColor: AppColors.warning,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
+      return;
+    }
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      // Convert comments to Map<int, String>
+      Map<int, String> commentsMap = {};
+      for (var entry in _comments.entries) {
+        commentsMap[entry.key] = entry.value.text;
+      }
       
-      widget.onBack();
+      // Create EvaluasiData
+      final evaluasiData = EvaluasiData.fromEmployee(
+        widget.employee,
+        ratings: _ratings,
+        comments: commentsMap,
+        recommendation: _recommendation,
+        perpanjangBulan: _perpanjangBulan,
+        catatan: _notesController.text,
+        namaEvaluator: 'HR Manager', // TODO: Get from auth
+      );
+      
+      // Generate and show print dialog
+      await EvaluasiPdfGenerator.printPdf(evaluasiData);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white),
+                SizedBox(width: 12),
+                Text('PDF berhasil dibuat'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Error: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

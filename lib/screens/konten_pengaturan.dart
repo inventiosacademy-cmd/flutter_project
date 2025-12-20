@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../providers/prov_auth.dart' as app_auth;
 import '../theme/warna.dart';
@@ -171,6 +173,21 @@ class _SettingsContentState extends State<SettingsContent> {
             title: "Ubah Password",
             subtitle: "Ganti kata sandi akun Anda",
             onTap: () => _resetPassword(context),
+          ),
+          
+          _buildSectionHeader("Notifikasi"),
+          _buildActionItem(
+            icon: Icons.email_outlined,
+            title: "Pengaturan Email Notifikasi",
+            subtitle: "Atur email untuk reminder PKWT segera berakhir",
+            onTap: () => _showEmailNotificationSettings(context),
+          ),
+          const Divider(height: 1, indent: 64, color: Color(0xFFF1F5F9)),
+          _buildActionItem(
+            icon: Icons.send_outlined,
+            title: "Test Kirim Email",
+            subtitle: "Kirim email test untuk verifikasi pengaturan",
+            onTap: () => _testSendEmail(context),
           ),
           
           _buildSectionHeader("Informasi Aplikasi"),
@@ -406,4 +423,358 @@ class _SettingsContentState extends State<SettingsContent> {
       ),
     );
   }
+
+  void _showEmailNotificationSettings(BuildContext context) async {
+    final emailPengirimController = TextEditingController();
+    final passwordAplikasiController = TextEditingController();
+    final emailPenerimaController = TextEditingController();
+    bool isLoading = true;
+    bool isSaving = false;
+    bool obscurePassword = true;
+
+    // Load existing settings from Firestore
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('notifications')
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data()!;
+        emailPengirimController.text = data['emailPengirim'] ?? '';
+        passwordAplikasiController.text = data['passwordAplikasi'] ?? '';
+        emailPenerimaController.text = data['emailPenerima'] ?? '';
+      }
+      isLoading = false;
+    } catch (e) {
+      isLoading = false;
+    }
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.email_outlined, color: AppColors.primaryBlue),
+              SizedBox(width: 12),
+              Text("Pengaturan Email Notifikasi"),
+            ],
+          ),
+          content: isLoading
+              ? const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, color: AppColors.primaryBlue, size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                "Gunakan App Password Gmail, bukan password biasa",
+                                style: TextStyle(fontSize: 12, color: AppColors.primaryBlue),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: emailPengirimController,
+                        decoration: InputDecoration(
+                          labelText: "Email Pengirim (Gmail)",
+                          hintText: "contoh@gmail.com",
+                          prefixIcon: const Icon(Icons.alternate_email),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: passwordAplikasiController,
+                        obscureText: obscurePassword,
+                        decoration: InputDecoration(
+                          labelText: "App Password Gmail",
+                          hintText: "xxxx xxxx xxxx xxxx",
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () {
+                          // Open Google App Password page info
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Buka: myaccount.google.com > Security > 2-Step Verification > App Passwords"),
+                              duration: Duration(seconds: 5),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          "Cara membuat App Password →",
+                          style: TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontSize: 12,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: emailPenerimaController,
+                        decoration: InputDecoration(
+                          labelText: "Email Penerima Notifikasi",
+                          hintText: "hr@company.com",
+                          prefixIcon: const Icon(Icons.mark_email_read_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Jadwal Notifikasi:",
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "• Setiap hari jam 08:00 WIB\n• H-30, H-14, H-7, H-3, H-1 sebelum PKWT berakhir",
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (emailPengirimController.text.isEmpty ||
+                          passwordAplikasiController.text.isEmpty ||
+                          emailPenerimaController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Semua field harus diisi"),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() => isSaving = true);
+
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection('settings')
+                            .doc('notifications')
+                            .set({
+                          'emailPengirim': emailPengirimController.text.trim(),
+                          'passwordAplikasi': passwordAplikasiController.text.trim(),
+                          'emailPenerima': emailPenerimaController.text.trim(),
+                          'hariSebelumExpired': [30, 14, 7, 3, 1],
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        });
+
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Pengaturan email berhasil disimpan"),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setState(() => isSaving = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Gagal menyimpan: $e"),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text("Simpan"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _testSendEmail(BuildContext context) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.send_outlined, color: AppColors.primaryBlue),
+            SizedBox(width: 12),
+            Text("Test Kirim Email"),
+          ],
+        ),
+        content: const Text(
+          "Ini akan mengirim email test ke alamat yang sudah dikonfigurasi. "
+          "Pastikan pengaturan email sudah benar.\n\n"
+          "Lanjutkan?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Kirim Test"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text("Mengirim email test..."),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Check if settings exist
+      final settingsDoc = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('notifications')
+          .get();
+
+      if (!settingsDoc.exists) {
+        if (context.mounted) {
+          Navigator.pop(context); // Close loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Pengaturan email belum dikonfigurasi. Silakan atur terlebih dahulu."),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Call the test function URL
+      const functionUrl = "https://asia-southeast2-hr-bagong.cloudfunctions.net/testEmailNotification";
+      
+      final response = await http.get(Uri.parse(functionUrl));
+      
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['success'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("✅ ${data['message'] ?? 'Email berhasil dikirim'}"),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("⚠️ ${data['message'] ?? 'Gagal mengirim email'}"),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } else {
+          final data = json.decode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("❌ Error: ${data['error'] ?? response.statusCode}"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 }
+

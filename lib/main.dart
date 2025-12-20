@@ -44,6 +44,12 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {
+          // Initialize EvaluasiProvider when user is logged in
+          if (auth.isLoggedIn) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Provider.of<EvaluasiProvider>(context, listen: false).init();
+            });
+          }
           return MaterialApp(
             title: 'HR Dashboard',
             debugShowCheckedModeBanner: false,
@@ -55,3 +61,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
