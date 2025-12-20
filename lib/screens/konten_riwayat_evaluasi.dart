@@ -968,18 +968,18 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
         mangkir: evaluasi.mangkir,
       );
       
-      // Generate and show print dialog
-      await EvaluasiPdfGenerator.printPdf(evaluasiData);
+      // Save PDF and open in browser
+      final filePath = await EvaluasiPdfGenerator.savePdfAndOpen(evaluasiData);
       
       if (mounted) {
         Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 12),
-                Text('PDF berhasil dibuat'),
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('PDF disimpan: $filePath')),
               ],
             ),
             backgroundColor: Color(0xFF22C55E),

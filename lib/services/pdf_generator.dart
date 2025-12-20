@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/karyawan.dart';
 
 /// Data class untuk menyimpan hasil evaluasi lengkap
@@ -779,7 +782,27 @@ class EvaluasiPdfGenerator {
     );
   }
   
-  /// Print or share the PDF
+  /// Save PDF and open in browser for preview
+  static Future<String> savePdfAndOpen(EvaluasiData data) async {
+    final pdfData = await generatePdf(data);
+    
+    // Get temp directory and save PDF
+    final directory = await getApplicationDocumentsDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final filePath = '${directory.path}/evaluasi_${data.namaKaryawan.replaceAll(' ', '_')}_$timestamp.pdf';
+    final file = File(filePath);
+    await file.writeAsBytes(pdfData);
+    
+    // Open in default app (browser/PDF viewer)
+    final uri = Uri.file(filePath);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+    
+    return filePath;
+  }
+  
+  /// Print the PDF (legacy - goes to print dialog)
   static Future<void> printPdf(EvaluasiData data) async {
     final pdfData = await generatePdf(data);
     await Printing.layoutPdf(onLayout: (_) => pdfData);
