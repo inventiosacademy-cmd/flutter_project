@@ -5,6 +5,7 @@ import '../providers/prov_evaluasi.dart';
 import '../models/evaluasi.dart';
 import '../theme/warna.dart';
 import '../services/pdf_generator.dart';
+import 'package:printing/printing.dart';
 
 class KontenRiwayatEvaluasi extends StatefulWidget {
   final VoidCallback? onBuatEvaluasi;
@@ -967,3 +968,5 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
   void _exportPdfFromEvaluasi(Evaluasi evaluasi) async {
     // This method is now kept as a backup if needed, but not used by default actions
     // as we prefer the in-app preview dialog.
+  }
+}

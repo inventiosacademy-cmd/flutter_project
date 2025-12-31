@@ -8,6 +8,7 @@ import '../providers/prov_karyawan.dart';
 import '../providers/prov_evaluasi.dart';
 import '../theme/warna.dart';
 import '../services/pdf_generator.dart';
+import 'package:printing/printing.dart';
 
 class KontenEvaluasi extends StatefulWidget {
   final Employee employee;
