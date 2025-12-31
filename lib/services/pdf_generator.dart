@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart';
 import '../models/karyawan.dart';
 
 /// Data class untuk menyimpan hasil evaluasi lengkap
@@ -783,10 +784,19 @@ class EvaluasiPdfGenerator {
   }
   
   /// Save PDF and open in browser for preview
-  static Future<String> savePdfAndOpen(EvaluasiData data) async {
+  static Future<String?> savePdfAndOpen(EvaluasiData data) async {
     final pdfData = await generatePdf(data);
     
-    // Get temp directory and save PDF
+    if (kIsWeb) {
+      // On Web, using Printing.layoutPdf is the best way to allow users to save/print
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdfData,
+        name: 'evaluasi_${data.namaKaryawan.replaceAll(' ', '_')}.pdf',
+      );
+      return null; // No file path on web
+    }
+    
+    // Get temp directory and save PDF (Native only)
     final directory = await getApplicationDocumentsDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final filePath = '${directory.path}/evaluasi_${data.namaKaryawan.replaceAll(' ', '_')}_$timestamp.pdf';

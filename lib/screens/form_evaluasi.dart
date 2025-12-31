@@ -260,67 +260,65 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       return;
     }
     
-    setState(() => _isLoading = true);
-    
-    try {
-      // Convert comments to Map<int, String>
-      Map<int, String> commentsMap = {};
-      for (var entry in _comments.entries) {
-        commentsMap[entry.key] = entry.value.text;
-      }
-      
-      // Create EvaluasiData
-      final evaluasiData = EvaluasiData.fromEmployee(
-        widget.employee,
-        ratings: _ratings,
-        comments: commentsMap,
-        recommendation: _recommendation,
-        perpanjangBulan: _perpanjangBulan,
-        catatan: _notesController.text,
-        namaEvaluator: 'HR Manager', // TODO: Get from auth
-      );
-      
-      // Generate and show print dialog
-      await EvaluasiPdfGenerator.printPdf(evaluasiData);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 12),
-                Text('PDF berhasil dibuat'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_rounded, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Error: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    // Show preview dialog instead of direct print
+    _showPdfPreview();
+  }
+
+  void _showPdfPreview() {
+    // Convert comments to Map<int, String>
+    Map<int, String> commentsMap = {};
+    for (var entry in _comments.entries) {
+      commentsMap[entry.key] = entry.value.text;
     }
+    
+    // Create EvaluasiData
+    final evaluasiData = EvaluasiData.fromEmployee(
+      widget.employee,
+      ratings: _ratings,
+      comments: commentsMap,
+      recommendation: _recommendation,
+      perpanjangBulan: _perpanjangBulan,
+      catatan: _notesController.text,
+      namaEvaluator: 'HR Manager', // TODO: Get from auth
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.9,
+          child: Column(
+            children: [
+              AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                title: Text("Preview PDF - ${widget.employee.nama}", 
+                  style: const TextStyle(color: Color(0xFF1E293B), fontSize: 18, fontWeight: FontWeight.bold)),
+                leading: IconButton(
+                  icon: const Icon(Icons.close, color: Color(0xFF1E293B)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                centerTitle: true,
+              ),
+              Expanded(
+                child: PdfPreview(
+                  build: (format) => EvaluasiPdfGenerator.generatePdf(evaluasiData),
+                  allowPrinting: true,
+                  allowSharing: true,
+                  canChangePageFormat: false,
+                  canChangeOrientation: false,
+                  pdfFileName: 'evaluasi_${widget.employee.nama.replaceAll(' ', '_')}.pdf',
+                  loadingWidget: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override

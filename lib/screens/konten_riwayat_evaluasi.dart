@@ -76,19 +76,19 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                     ),
                   ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: widget.onBuatEvaluasi,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text("Buat Evaluasi Baru"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+                // ElevatedButton.icon(
+                //   onPressed: widget.onBuatEvaluasi,
+                //   icon: const Icon(Icons.add, size: 18),
+                //   label: const Text("Buat Evaluasi Baru"),
+                //   style: ElevatedButton.styleFrom(
+                //     backgroundColor: AppColors.primaryBlue,
+                //     foregroundColor: Colors.white,
+                //     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                //     shape: RoundedRectangleBorder(
+                //       borderRadius: BorderRadius.circular(10),
+                //     ),
+                //   ),
+                // ),
               ],
             ),
 
@@ -208,7 +208,6 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                       children: [
                         _buildTableHeader("KARYAWAN", flex: 2),
                         _buildTableHeader("TANGGAL", flex: 1),
-                        _buildTableHeader("NILAI", flex: 1, center: true),
                         _buildTableHeader("STATUS", flex: 1, center: true),
                         _buildTableHeader("AKSI", flex: 1, center: true),
                       ],
@@ -536,32 +535,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
             ),
           ),
-          // Nilai
-          Expanded(
-            flex: 1,
-            child: Center(
-              child: Container(
-                constraints: const BoxConstraints(minWidth: 40),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getNilaiColor(evaluasi.nilaiKinerja).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _getNilaiColor(evaluasi.nilaiKinerja).withOpacity(0.3),
-                  ),
-                ),
-                child: Text(
-                  evaluasi.nilaiKinerja,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _getNilaiColor(evaluasi.nilaiKinerja),
-                  ),
-                ),
-              ),
-            ),
-          ),
+
           // Status
           Expanded(
             flex: 1,
@@ -610,7 +584,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                     } else if (value == 'view') {
                       _showDetailDialog(evaluasi);
                     } else if (value == 'pdf') {
-                      _exportPdfFromEvaluasi(evaluasi);
+                      _showPdfPreview(evaluasi);
                     }
                   },
                   itemBuilder: (context) => [
@@ -889,7 +863,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
-              _exportPdfFromEvaluasi(evaluasi);
+              _showPdfPreview(evaluasi);
             },
             icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
             label: const Text("Export PDF"),
@@ -922,80 +896,74 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
     );
   }
 
-  void _exportPdfFromEvaluasi(Evaluasi evaluasi) async {
-    // Show loading
+  void _showPdfPreview(Evaluasi evaluasi) {
+    // Generate evaluation data
+    Map<int, int?> ratingsNullable = {};
+    for (var entry in evaluasi.ratings.entries) {
+      ratingsNullable[entry.key] = entry.value;
+    }
+
+    final evaluasiData = EvaluasiData(
+      namaKaryawan: evaluasi.employeeName,
+      posisi: evaluasi.employeePosition,
+      departemen: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
+      lokasiKerja: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
+      atasanLangsung: evaluasi.atasanLangsung.isNotEmpty ? evaluasi.atasanLangsung : evaluasi.evaluator,
+      tanggalMasuk: evaluasi.tanggalMasuk,
+      tanggalPkwtBerakhir: evaluasi.tanggalPkwtBerakhir,
+      pkwtKe: evaluasi.pkwtKe,
+      tanggalEvaluasi: evaluasi.tanggalEvaluasi,
+      ratings: ratingsNullable,
+      comments: evaluasi.comments,
+      recommendation: evaluasi.recommendation,
+      perpanjangBulan: evaluasi.perpanjangBulan,
+      catatan: evaluasi.catatan,
+      namaEvaluator: evaluasi.evaluator,
+      sakit: evaluasi.sakit,
+      izin: evaluasi.izin,
+      terlambat: evaluasi.terlambat,
+      mangkir: evaluasi.mangkir,
+    );
+
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text("Membuat PDF..."),
-          ],
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.9,
+          child: Column(
+            children: [
+              AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                title: Text("Preview PDF - ${evaluasi.employeeName}", 
+                  style: const TextStyle(color: Color(0xFF1E293B), fontSize: 18, fontWeight: FontWeight.bold)),
+                leading: IconButton(
+                  icon: const Icon(Icons.close, color: Color(0xFF1E293B)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                centerTitle: true,
+              ),
+              Expanded(
+                child: PdfPreview(
+                  build: (format) => EvaluasiPdfGenerator.generatePdf(evaluasiData),
+                  allowPrinting: true,
+                  allowSharing: true,
+                  canChangePageFormat: false,
+                  canChangeOrientation: false,
+                  pdfFileName: 'evaluasi_${evaluasi.employeeName.replaceAll(' ', '_')}.pdf',
+                  loadingWidget: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-
-    try {
-      // Convert ratings to nullable map for EvaluasiData
-      Map<int, int?> ratingsNullable = {};
-      for (var entry in evaluasi.ratings.entries) {
-        ratingsNullable[entry.key] = entry.value;
-      }
-      
-      // Create EvaluasiData from actual stored data
-      final evaluasiData = EvaluasiData(
-        namaKaryawan: evaluasi.employeeName,
-        posisi: evaluasi.employeePosition,
-        departemen: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
-        lokasiKerja: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
-        atasanLangsung: evaluasi.atasanLangsung.isNotEmpty ? evaluasi.atasanLangsung : evaluasi.evaluator,
-        tanggalMasuk: evaluasi.tanggalMasuk,
-        tanggalPkwtBerakhir: evaluasi.tanggalPkwtBerakhir,
-        pkwtKe: evaluasi.pkwtKe,
-        tanggalEvaluasi: evaluasi.tanggalEvaluasi,
-        ratings: ratingsNullable,
-        comments: evaluasi.comments,
-        recommendation: evaluasi.recommendation,
-        perpanjangBulan: evaluasi.perpanjangBulan,
-        catatan: evaluasi.catatan,
-        namaEvaluator: evaluasi.evaluator,
-        sakit: evaluasi.sakit,
-        izin: evaluasi.izin,
-        terlambat: evaluasi.terlambat,
-        mangkir: evaluasi.mangkir,
-      );
-      
-      // Save PDF and open in browser
-      final filePath = await EvaluasiPdfGenerator.savePdfAndOpen(evaluasiData);
-      
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('PDF disimpan: $filePath')),
-              ],
-            ),
-            backgroundColor: Color(0xFF22C55E),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
-}
+
+  void _exportPdfFromEvaluasi(Evaluasi evaluasi) async {
+    // This method is now kept as a backup if needed, but not used by default actions
+    // as we prefer the in-app preview dialog.
