@@ -152,17 +152,17 @@ class ImportService {
 
     // Define Header Style
     CellStyle headerStyle = CellStyle(
-      fontFamily: getFontFamily(FontFamily.Calibri),
+      fontFamily: 'Calibri',
       bold: true,
       fontSize: 12,
-      backgroundColorHex: ExcelColor.blue200,
+      backgroundColorHex: ExcelColor.fromHexString('#BFDBFE'), // Blue 200 equivalent
       horizontalAlign: HorizontalAlign.Center,
       verticalAlign: VerticalAlign.Center,
     );
 
     // Define Data Style
     CellStyle dataStyle = CellStyle(
-      fontFamily: getFontFamily(FontFamily.Calibri),
+      fontFamily: 'Calibri',
       fontSize: 11,
       horizontalAlign: HorizontalAlign.Left,
       verticalAlign: VerticalAlign.Center,

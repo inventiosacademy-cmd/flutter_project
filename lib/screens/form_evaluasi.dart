@@ -9,6 +9,7 @@ import '../providers/prov_evaluasi.dart';
 import '../theme/warna.dart';
 import '../services/pdf_generator.dart';
 import 'package:printing/printing.dart';
+import '../widgets/pdf_preview_dialog.dart';
 
 class KontenEvaluasi extends StatefulWidget {
   final Employee employee;
@@ -283,42 +284,10 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       namaEvaluator: 'HR Manager', // TODO: Get from auth
     );
 
-    showDialog(
+    ModernPdfPreviewDialog.show(
       context: context,
-      builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.8,
-          height: MediaQuery.of(context).size.height * 0.9,
-          child: Column(
-            children: [
-              AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                title: Text("Preview PDF - ${widget.employee.nama}", 
-                  style: const TextStyle(color: Color(0xFF1E293B), fontSize: 18, fontWeight: FontWeight.bold)),
-                leading: IconButton(
-                  icon: const Icon(Icons.close, color: Color(0xFF1E293B)),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                centerTitle: true,
-              ),
-              Expanded(
-                child: PdfPreview(
-                  build: (format) => EvaluasiPdfGenerator.generatePdf(evaluasiData),
-                  allowPrinting: true,
-                  allowSharing: true,
-                  canChangePageFormat: false,
-                  canChangeOrientation: false,
-                  pdfFileName: 'evaluasi_${widget.employee.nama.replaceAll(' ', '_')}.pdf',
-                  loadingWidget: const Center(child: CircularProgressIndicator()),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      evaluasiData: evaluasiData,
+      fileName: 'evaluasi_${widget.employee.nama.replaceAll(' ', '_')}.pdf',
     );
   }
 

@@ -4,6 +4,11 @@ import 'package:provider/provider.dart';
 import '../models/karyawan.dart';
 import '../providers/prov_karyawan.dart';
 import '../theme/warna.dart';
+import '../providers/prov_evaluasi.dart';
+import '../models/evaluasi.dart';
+import '../services/pdf_generator.dart';
+import 'package:printing/printing.dart';
+import '../widgets/pdf_preview_dialog.dart';
 
 class KontenDetailKaryawan extends StatefulWidget {
   final Employee employee;
@@ -318,179 +323,116 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
   }
 
   Widget _buildEvaluationTimeline() {
-    // Sample evaluation data
-    final evaluations = [
-      _EvaluationItem(
-        date: DateTime(2024, 12, 1),
-        title: "Evaluasi Kinerja Q4 2024",
-        score: "A",
-        notes: "Kinerja sangat baik, mencapai target penjualan 120%",
-      ),
-      _EvaluationItem(
-        date: DateTime(2024, 9, 1),
-        title: "Evaluasi Kinerja Q3 2024",
-        score: "A-",
-        notes: "Kinerja baik, perlu peningkatan di area komunikasi tim",
-      ),
-      _EvaluationItem(
-        date: DateTime(2024, 6, 1),
-        title: "Evaluasi Kinerja Q2 2024",
-        score: "B+",
-        notes: "Kinerja cukup baik, adaptasi dengan sistem baru",
-      ),
-    ];
+    return Consumer<EvaluasiProvider>(
+      builder: (context, provider, _) {
+        final evaluations = provider.getEvaluasiByEmployee(widget.employee.id);
 
-    if (evaluations.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(48),
-          child: Column(
-            children: [
-              Icon(
-                Icons.assessment_outlined,
-                size: 64,
-                color: Colors.grey.shade300,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "Belum ada data evaluasi",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: evaluations.map((eval) {
-        return _buildEvaluationCard(eval);
-      }).toList(),
-    );
-  }
-
-  Widget _buildEvaluationCard(_EvaluationItem evaluation) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Score Badge
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              color: _getScoreColor(evaluation.score).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _getScoreColor(evaluation.score).withOpacity(0.3),
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                evaluation.score,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: _getScoreColor(evaluation.score),
-                ),
-              ),
-            ),
-          ),
-          
-          const SizedBox(width: 20),
-          
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        evaluation.title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        DateFormat('dd MMM yyyy').format(evaluation.date),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  evaluation.notes,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade700,
-                    height: 1.5,
+        if (evaluations.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(48),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.assessment_outlined,
+                    size: 64,
+                    color: Colors.grey.shade300,
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Belum ada data evaluasi",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              dividerColor: const Color(0xFFE2E8F0),
+            ),
+            child: DataTable(
+              headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
+              columnSpacing: 24,
+              columns: const [
+                DataColumn(
+                  label: Text('Tanggal Evaluasi', 
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))
+                ),
+                DataColumn(
+                  label: Text('Laporan PDF', 
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))
                 ),
               ],
+              rows: evaluations.map((eval) {
+                return DataRow(cells: [
+                  DataCell(Text(DateFormat('dd MMMM yyyy').format(eval.tanggalEvaluasi),
+                    style: const TextStyle(color: Color(0xFF334155)))),
+                  DataCell(
+                    IconButton(
+                      icon: Icon(Icons.picture_as_pdf, color: AppColors.error),
+                      onPressed: () => _showPdfPreview(eval),
+                      tooltip: "Lihat PDF",
+                    ),
+                  ),
+                ]);
+              }).toList(),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Color _getScoreColor(String score) {
-    if (score.startsWith('A')) {
-      return const Color(0xFF059669);
-    } else if (score.startsWith('B')) {
-      return AppColors.primaryBlue;
-    } else if (score.startsWith('C')) {
-      return const Color(0xFFF59E0B);
-    } else {
-      return const Color(0xFFEF4444);
+  void _showPdfPreview(Evaluasi evaluasi) {
+    // Generate evaluation data
+    Map<int, int?> ratingsNullable = {};
+    for (var entry in evaluasi.ratings.entries) {
+      ratingsNullable[entry.key] = entry.value;
     }
+
+    // Generate EvaluasiData for PDF
+    final evaluasiData = EvaluasiData(
+      namaKaryawan: evaluasi.employeeName,
+      posisi: evaluasi.employeePosition,
+      departemen: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
+      lokasiKerja: evaluasi.employeeDepartemen.isNotEmpty ? evaluasi.employeeDepartemen : '-',
+      atasanLangsung: evaluasi.atasanLangsung.isNotEmpty ? evaluasi.atasanLangsung : evaluasi.evaluator,
+      tanggalMasuk: evaluasi.tanggalMasuk,
+      tanggalPkwtBerakhir: evaluasi.tanggalPkwtBerakhir,
+      pkwtKe: evaluasi.pkwtKe,
+      tanggalEvaluasi: evaluasi.tanggalEvaluasi,
+      ratings: ratingsNullable,
+      comments: evaluasi.comments,
+      recommendation: evaluasi.recommendation,
+      perpanjangBulan: evaluasi.perpanjangBulan,
+      catatan: evaluasi.catatan,
+      namaEvaluator: evaluasi.evaluator,
+      sakit: evaluasi.sakit,
+      izin: evaluasi.izin,
+      terlambat: evaluasi.terlambat,
+      mangkir: evaluasi.mangkir,
+    );
+
+    ModernPdfPreviewDialog.show(
+      context: context,
+      evaluasiData: evaluasiData,
+      fileName: 'evaluasi_${evaluasi.employeeName.replaceAll(' ', '_')}.pdf',
+    );
   }
+
 }
 
-class _EvaluationItem {
-  final DateTime date;
-  final String title;
-  final String score;
-  final String notes;
-
-  _EvaluationItem({
-    required this.date,
-    required this.title,
-    required this.score,
-    required this.notes,
-  });
-}
