@@ -78,8 +78,16 @@ class EmployeeProvider with ChangeNotifier {
   }
 
   Future<void> addEmployees(List<Employee> employees) async {
-    if (_userId == null || employees.isEmpty) return;
+    print("addEmployees called with ${employees.length} employees");
+    print("Current userId: $_userId");
+    
+    if (_userId == null || employees.isEmpty) {
+      print("Cannot save: userId is null or employees list is empty");
+      return;
+    }
+    
     try {
+      print("Creating batch operation...");
       final batch = _firestore.batch();
       final collection = _firestore
           .collection('users')
@@ -87,13 +95,17 @@ class EmployeeProvider with ChangeNotifier {
           .collection('employees');
 
       for (var emp in employees) {
+        print("Adding employee to batch: ${emp.nama} (ID: ${emp.id})");
         final docRef = collection.doc(emp.id);
         batch.set(docRef, emp.toMap());
       }
 
+      print("Committing batch to Firestore...");
       await batch.commit();
+      print("Batch committed successfully!");
     } catch (e) {
       debugPrint("Error adding employees batch: $e");
+      print("Full error details: $e");
       rethrow;
     }
   }
