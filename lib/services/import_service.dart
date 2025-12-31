@@ -32,6 +32,7 @@ class ImportService {
       if (result != null) {
         PlatformFile pFile = result.files.single;
         String extension = pFile.extension?.toLowerCase() ?? '';
+        print("Selected file: ${pFile.name}, extension: $extension");
         
         // Use bytes if available (Web or withData: true), otherwise try path
         List<int>? fileBytes = pFile.bytes;
@@ -43,12 +44,17 @@ class ImportService {
         }
 
         if (fileBytes != null) {
+          print("File bytes loaded: ${fileBytes.length} bytes");
           if (extension == 'csv') {
             return _parseCsvBytes(fileBytes);
           } else if (extension == 'xlsx' || extension == 'xls') {
             return _parseExcelBytes(fileBytes);
           }
+        } else {
+          print("Failed to load file bytes");
         }
+      } else {
+        print("File picker cancelled");
       }
     } catch (e) {
       print("Error picking/parsing file: $e");
@@ -61,19 +67,29 @@ class ImportService {
     final input = utf8.decode(bytes);
     List<List<dynamic>> fields = const CsvToListConverter().convert(input);
     
-    // Remove header if present
-    if (fields.isNotEmpty && fields[0][0].toString().toLowerCase().contains('nama')) {
-      fields.removeAt(0);
+    // Remove header if present (check for common header keywords)
+    if (fields.isNotEmpty && fields[0].isNotEmpty) {
+      String firstCell = fields[0][0].toString().toLowerCase();
+      if (firstCell.contains('nama') || firstCell == 'name') {
+        fields.removeAt(0);
+      }
     }
 
     List<Employee> employees = [];
     for (var row in fields) {
+      // Skip empty rows
+      if (row.isEmpty || row.every((val) => val == null || val.toString().trim().isEmpty)) {
+        continue;
+      }
+      
       if (row.length >= 7) {
         try {
           employees.add(_mapRowToEmployee(row));
         } catch (e) {
           print("Error parsing row: $row, error: $e");
         }
+      } else {
+        print("Skipping row with insufficient columns: $row");
       }
     }
     return employees;
@@ -97,8 +113,16 @@ class ImportService {
         // Convert Data objects to values
         List<dynamic> rowValues = row.map((cell) => cell?.value).toList();
         
-        // Check if row is empty
-        if (rowValues.every((val) => val == null)) continue;
+        // Check if row is empty or all values are null/empty
+        if (rowValues.isEmpty || rowValues.every((val) => val == null || val.toString().trim().isEmpty)) {
+          continue;
+        }
+
+        // Ensure we have at least 7 columns
+        if (rowValues.length < 7) {
+          print("Skipping row with insufficient columns: $rowValues");
+          continue;
+        }
 
         try {
           employees.add(_mapRowToEmployee(rowValues));
@@ -112,15 +136,35 @@ class ImportService {
 
   Employee _mapRowToEmployee(List<dynamic> row) {
     // Helper to safely get string
-    String getString(dynamic val) => val?.toString() ?? '';
+    String getString(dynamic val) => val?.toString().trim() ?? '';
     
-    // Helper to parse date
+    // Helper to parse date with multiple format support
     DateTime parseDate(dynamic val) {
       if (val == null) return DateTime.now();
       if (val is DateTime) return val;
+      
+      String dateStr = val.toString().trim();
+      if (dateStr.isEmpty) return DateTime.now();
+      
       try {
-        return DateTime.parse(val.toString());
+        // Try ISO format first (YYYY-MM-DD)
+        return DateTime.parse(dateStr);
       } catch (e) {
+        // Try Indonesian format (DD-MM-YYYY or DD/MM/YYYY)
+        try {
+          List<String> parts = dateStr.contains('-') 
+              ? dateStr.split('-') 
+              : dateStr.split('/');
+          
+          if (parts.length == 3) {
+            int day = int.parse(parts[0]);
+            int month = int.parse(parts[1]);
+            int year = int.parse(parts[2]);
+            return DateTime(year, month, day);
+          }
+        } catch (e2) {
+          print("Failed to parse date: $dateStr, error: $e2");
+        }
         return DateTime.now();
       }
     }
@@ -129,7 +173,8 @@ class ImportService {
     int getInt(dynamic val) {
       if (val == null) return 1;
       if (val is int) return val;
-      return int.tryParse(val.toString()) ?? 1;
+      String strVal = val.toString().trim();
+      return int.tryParse(strVal) ?? 1;
     }
 
     return Employee(

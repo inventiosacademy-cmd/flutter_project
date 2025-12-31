@@ -80,8 +80,7 @@ class ImportDialog extends StatelessWidget {
               ),
               title: const Text("Upload File"),
               subtitle: const Text("Support .xlsx, .xls, .csv"),
-              onTap: () async {
-                Navigator.pop(context);
+              onTap: () {
                 _handleFileUpload(context);
               },
             ),
@@ -91,96 +90,112 @@ class ImportDialog extends StatelessWidget {
     );
   }
 
-  void _handleFileUpload(BuildContext context) async {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text("Memproses file..."),
+  void _handleFileUpload(BuildContext dialogContext) async {
+    print("_handleFileUpload called");
+    
+    try {
+      print("Starting file picker...");
+      final employees = await ImportService().pickAndParseFile();
+      print("Parsed ${employees.length} employees");
+      print("Context mounted: ${dialogContext.mounted}");
+      
+      // Get navigator context BEFORE closing dialog - this stays valid
+      final scaffoldMessenger = ScaffoldMessenger.of(dialogContext);
+      final navigator = Navigator.of(dialogContext);
+      
+      if (!dialogContext.mounted) {
+        print("ERROR: context not mounted!");
+        return;
+      }
+      
+      Navigator.pop(dialogContext);
+      print("Dialog closed");
+      
+      if (employees.isEmpty) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text("Tidak ada data dalam file"),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      
+      print("Showing confirmation");
+      final confirmed = await showDialog<bool>(
+        context: navigator.context,
+        builder: (ctx) => AlertDialog(
+          title: const Text("Konfirmasi"),
+          content: Text("Import ${employees.length} data?"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                print("❌ USER CLICKED BATAL");
+                Navigator.pop(ctx, false);
+              },
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                print("✅ USER CLICKED IMPORT");
+                Navigator.pop(ctx, true);
+              },
+              child: const Text("Import"),
+            ),
           ],
         ),
-      ),
-    );
+      );
 
-    try {
-      final employees = await ImportService().pickAndParseFile();
-      
-      if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        
-        if (employees.isNotEmpty) {
-          // Show confirmation
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text("Konfirmasi Import"),
-              content: Text("Akan mengimport ${employees.length} data karyawan. Lanjutkan?"),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text("Batal"),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text("Import"),
-                ),
+      print("📊 Confirmed: $confirmed");
+      print("📊 Navigator context mounted: ${navigator.context.mounted}");
+
+      if (confirmed == true) {
+        print("✅ STARTING SAVE...");
+        showDialog(
+          context: navigator.context,
+          barrierDismissible: false,
+          builder: (ctx) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text("Menyimpan..."),
               ],
             ),
+          ),
+        );
+
+        try {
+          print("🔥 Getting provider...");
+          final provider = Provider.of<EmployeeProvider>(navigator.context, listen: false);
+          print("🔥 Calling addEmployees(${employees.length})...");
+          await provider.addEmployees(employees);
+          print("✅ SAVED TO FIREBASE!");
+
+          navigator.pop();
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text("✅ Berhasil import ${employees.length} data"),
+              backgroundColor: Colors.green,
+            ),
           );
-
-          if (confirmed == true && context.mounted) {
-            // Show saving loading
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (ctx) => const AlertDialog(
-                content: Row(
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(width: 20),
-                    Text("Menyimpan data..."),
-                  ],
-                ),
-              ),
-            );
-
-            await Provider.of<EmployeeProvider>(context, listen: false)
-                .addEmployees(employees);
-
-            if (context.mounted) {
-              Navigator.pop(context); // Close saving loading
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Berhasil mengimport ${employees.length} data"),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          }
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Tidak ada data yang ditemukan dalam file"),
-              backgroundColor: Colors.orange,
+        } catch (e, stack) {
+          print("❌ SAVE ERROR: $e");
+          print("Stack: $stack");
+          navigator.pop();
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text("❌ Gagal: $e"),
+              backgroundColor: Colors.red,
             ),
           );
         }
+      } else {
+        print("❌ User cancelled");
       }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } catch (e, stack) {
+      print("ERROR: $e");
+      print("Stack: $stack");
     }
   }
 }
