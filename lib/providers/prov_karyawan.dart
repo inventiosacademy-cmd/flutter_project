@@ -77,6 +77,27 @@ class EmployeeProvider with ChangeNotifier {
     }
   }
 
+  Future<void> addEmployees(List<Employee> employees) async {
+    if (_userId == null || employees.isEmpty) return;
+    try {
+      final batch = _firestore.batch();
+      final collection = _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('employees');
+
+      for (var emp in employees) {
+        final docRef = collection.doc(emp.id);
+        batch.set(docRef, emp.toMap());
+      }
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint("Error adding employees batch: $e");
+      rethrow;
+    }
+  }
+
   Future<void> updateEmployee(Employee employee) async {
     if (_userId == null) return;
     try {

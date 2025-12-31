@@ -5,6 +5,7 @@ import '../providers/prov_karyawan.dart';
 import '../providers/prov_evaluasi.dart';
 import '../models/karyawan.dart';
 import '../theme/warna.dart';
+import '../widgets/import_dialog.dart';
 
 class DashboardContent extends StatefulWidget {
   final VoidCallback? onTambahKaryawan;
@@ -85,7 +86,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 Row(
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: () => _showImportDialog(),
                       icon: const Icon(Icons.upload_outlined, size: 18),
                       label: const Text("Import Data"),
                       style: OutlinedButton.styleFrom(
@@ -836,6 +837,48 @@ class _DashboardContentState extends State<DashboardContent> {
                         widget.onEvaluasi?.call(emp);
                       } else if (value == 'edit') {
                         widget.onEdit?.call(emp);
+                      } else if (value == 'delete') {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text("Hapus Karyawan"),
+                            content: Text("Apakah Anda yakin ingin menghapus data ${emp.nama}?"),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text("Batal"),
+                              ),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  Navigator.pop(ctx); // Close dialog
+                                  try {
+                                    await Provider.of<EmployeeProvider>(context, listen: false)
+                                        .deleteEmployee(emp.id);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text("Data karyawan berhasil dihapus"),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text("Gagal menghapus data: $e"),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                child: const Text("Hapus", style: TextStyle(color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        );
                       }
                     },
                     itemBuilder: (context) => [
@@ -900,5 +943,12 @@ class _DashboardContentState extends State<DashboardContent> {
       const Color(0xFFEF4444),
     ];
     return colors[index % colors.length];
+  }
+
+  void _showImportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const ImportDialog(),
+    );
   }
 }
