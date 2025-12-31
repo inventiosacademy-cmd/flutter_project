@@ -425,26 +425,43 @@ class _SettingsContentState extends State<SettingsContent> {
   }
 
   void _showEmailNotificationSettings(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid;
+    final userEmail = user?.email ?? '';
+
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User session tidak ditemukan")),
+      );
+      return;
+    }
+
     final emailPengirimController = TextEditingController();
     final passwordAplikasiController = TextEditingController();
-    final emailPenerimaController = TextEditingController();
+    final emailPenerimaController = TextEditingController(text: userEmail);
     bool isLoading = true;
     bool isSaving = false;
     bool obscurePassword = true;
 
-    // Load existing settings from Firestore
+    // Load GLOBAL settings for Sender, and set INDIVIDUAL for Receiver
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('settings')
+      debugPrint("DEBUG: Loading from app_settings/notifications");
+      // 1. Get Global Sender Settings
+      final globalDoc = await FirebaseFirestore.instance
+          .collection('app_settings')
           .doc('notifications')
           .get();
       
-      if (doc.exists) {
-        final data = doc.data()!;
+      if (globalDoc.exists) {
+        final data = globalDoc.data()!;
         emailPengirimController.text = data['emailPengirim'] ?? '';
         passwordAplikasiController.text = data['passwordAplikasi'] ?? '';
-        emailPenerimaController.text = data['emailPenerima'] ?? '';
+        debugPrint("DEBUG: Global settings loaded: ${data['emailPengirim']}");
       }
+
+      // 2. Always override Receiver with current user email as requested
+      emailPenerimaController.text = userEmail;
+      
       isLoading = false;
     } catch (e) {
       isLoading = false;
@@ -547,10 +564,14 @@ class _SettingsContentState extends State<SettingsContent> {
                       const SizedBox(height: 20),
                       TextField(
                         controller: emailPenerimaController,
+                        readOnly: true, // "Set otomatis" - locked to current user
                         decoration: InputDecoration(
                           labelText: "Email Penerima Notifikasi",
                           hintText: "hr@company.com",
                           prefixIcon: const Icon(Icons.mark_email_read_outlined),
+                          helperText: "Otomatis diatur ke email Anda",
+                          fillColor: Colors.grey.shade50,
+                          filled: true,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -610,33 +631,76 @@ class _SettingsContentState extends State<SettingsContent> {
                       setState(() => isSaving = true);
 
                       try {
-                        await FirebaseFirestore.instance
-                            .collection('settings')
-                            .doc('notifications')
-                            .set({
-                          'emailPengirim': emailPengirimController.text.trim(),
-                          'passwordAplikasi': passwordAplikasiController.text.trim(),
-                          'emailPenerima': emailPenerimaController.text.trim(),
-                          'hariSebelumExpired': [30, 14, 7, 3, 1],
-                          'updatedAt': FieldValue.serverTimestamp(),
-                        });
+                        final auth = FirebaseAuth.instance;
+                        final currentUser = auth.currentUser;
+                        
+                        if (currentUser == null) {
+                          throw "Sesi login tidak valid. Silakan login kembali.";
+                        }
+                        
+                        final activeUid = currentUser.uid;
+                        debugPrint("DEBUG: Saving settings for user $activeUid (${currentUser.email})");
+
+                        // 1. Save Global Sender Settings
+                        debugPrint("DEBUG: Saving to app_settings/notifications...");
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('app_settings')
+                              .doc('notifications')
+                              .set({
+                            'emailPengirim': emailPengirimController.text.trim(),
+                            'passwordAplikasi': passwordAplikasiController.text.trim(),
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          }, SetOptions(merge: true));
+                          debugPrint("DEBUG: Global settings saved successfully");
+                        } catch (e) {
+                          debugPrint("DEBUG: Global settings FAILED: $e");
+                          throw "Gagal menyimpan pengirim (Global): $e";
+                        }
+
+                        // 2. Save Individual Receiver Preference
+                        debugPrint("DEBUG: Saving to users/$activeUid/settings/notifications...");
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(activeUid)
+                              .collection('settings')
+                              .doc('notifications')
+                              .set({
+                            'emailPenerima': emailPenerimaController.text.trim(), 
+                            'hariSebelumExpired': [30, 14, 7, 3, 1],
+                            'updatedAt': FieldValue.serverTimestamp(),
+                            'userId': activeUid,
+                          }, SetOptions(merge: true));
+                          debugPrint("DEBUG: User settings saved successfully");
+                        } catch (e) {
+                          debugPrint("DEBUG: User settings FAILED: $e");
+                          throw "Gagal menyimpan penerima (Individu): $e";
+                        }
 
                         if (context.mounted) {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text("Pengaturan email berhasil disimpan"),
+                              content: Text("✅ Pengaturan email berhasil disimpan"),
                               backgroundColor: Colors.green,
                             ),
                           );
                         }
                       } catch (e) {
+                        debugPrint("FIREBASE SAVE ERROR: $e");
                         setState(() => isSaving = false);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text("Gagal menyimpan: $e"),
+                              content: Text("Error: $e"),
                               backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 10),
+                              action: SnackBarAction(
+                                label: "Tutup",
+                                textColor: Colors.white,
+                                onPressed: () {},
+                              ),
                             ),
                           );
                         }
@@ -709,13 +773,41 @@ class _SettingsContentState extends State<SettingsContent> {
     );
 
     try {
-      // Check if settings exist
-      final settingsDoc = await FirebaseFirestore.instance
-          .collection('settings')
-          .doc('notifications')
-          .get();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw "Sesi login tidak valid. Silakan login kembali.";
+      
+      final uid = user.uid;
+      debugPrint("DEBUG: Test email verification for user $uid");
 
-      if (!settingsDoc.exists) {
+      // 1. Check Global Settings
+      late DocumentSnapshot globalSettings;
+      try {
+        globalSettings = await FirebaseFirestore.instance
+            .collection('app_settings')
+            .doc('notifications')
+            .get();
+        debugPrint("DEBUG: Global settings check OK");
+      } catch (e) {
+        debugPrint("DEBUG: Global settings check FAILED: $e");
+        throw "Gagal membaca pengirim (Global): $e";
+      }
+      
+      // 2. Check User Settings
+      late DocumentSnapshot userSettings;
+      try {
+        userSettings = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('settings')
+            .doc('notifications')
+            .get();
+        debugPrint("DEBUG: User settings check OK");
+      } catch (e) {
+        debugPrint("DEBUG: User settings check FAILED: $e");
+        throw "Gagal membaca penerima (Individu): $e";
+      }
+
+      if (!globalSettings.exists) {
         if (context.mounted) {
           Navigator.pop(context); // Close loading
           ScaffoldMessenger.of(context).showSnackBar(
@@ -765,6 +857,7 @@ class _SettingsContentState extends State<SettingsContent> {
         }
       }
     } catch (e) {
+      debugPrint("TEST EMAIL ERROR: $e");
       if (context.mounted) {
         Navigator.pop(context); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(

@@ -2,30 +2,9 @@
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Settings collection - hanya authenticated users yang bisa akses
-    match /settings/{document} {
-      allow read, write: if request.auth != null;
-    }
-    
-    // Users collection - hanya owner yang bisa akses data sendiri
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Sub-collection employees
-      match /employees/{employeeId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      // Sub-collection evaluasi
-      match /evaluasi/{evaluasiId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-    
-    // Notification logs - hanya untuk Cloud Functions (admin)
-    match /notification_logs/{logId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Hanya Cloud Functions yang bisa write
+    // MODE TOTAL OPEN (Hanya untuk Tes 5 Menit)
+    match /{allPaths=**} {
+      allow read, write: if true;
     }
   }
 }
