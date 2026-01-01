@@ -146,6 +146,11 @@ class EvaluasiPdfGenerator {
     final fontRegular = await PdfGoogleFonts.interRegular();
     final fontBold = await PdfGoogleFonts.interBold();
     
+    // Load logo image
+    final logoImage = await rootBundle.load('assets/logo_bm.png');
+    final logoImageBytes = logoImage.buffer.asUint8List();
+    final logo = pw.MemoryImage(logoImageBytes);
+    
     final dateFormat = DateFormat('dd/MM/yyyy');
     
     // Colors
@@ -165,7 +170,7 @@ class EvaluasiPdfGenerator {
         margin: const pw.EdgeInsets.all(40),
         build: (context) => [
           // HEADER
-          _buildHeader(headerStyle, labelStyle, valueStyle, borderColor),
+          _buildHeader(headerStyle, labelStyle, valueStyle, borderColor, logo),
           pw.SizedBox(height: 16),
           
           // EMPLOYEE INFO
@@ -211,20 +216,16 @@ class EvaluasiPdfGenerator {
     pw.TextStyle labelStyle,
     pw.TextStyle valueStyle,
     PdfColor borderColor,
+    pw.MemoryImage logo,
   ) {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // Logo placeholder
+        // Logo
         pw.Container(
           width: 60,
           height: 60,
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: borderColor),
-          ),
-          child: pw.Center(
-            child: pw.Text('LOGO', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-          ),
+          child: pw.Image(logo, fit: pw.BoxFit.contain),
         ),
         pw.SizedBox(width: 16),
         // Title

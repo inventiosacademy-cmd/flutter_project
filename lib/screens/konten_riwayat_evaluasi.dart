@@ -567,73 +567,27 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
           // Actions
           Expanded(
             flex: 1,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                PopupMenuButton<String>(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
+            child: Center(
+              child: Tooltip(
+                message: 'Lihat PDF',
+                child: InkWell(
+                  onTap: () => _showPdfPreview(evaluasi),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: const Color(0xFFFEE2E2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
                     ),
-                    child: Icon(Icons.more_horiz, size: 20, color: Colors.grey.shade600),
+                    child: const Icon(
+                      Icons.picture_as_pdf,
+                      size: 20,
+                      color: Color(0xFFEF4444),
+                    ),
                   ),
-                  onSelected: (value) {
-                    if (value == 'delete') {
-                      _showDeleteDialog(evaluasi.id, provider);
-                    } else if (value == 'view') {
-                      _showDetailDialog(evaluasi);
-                    } else if (value == 'pdf') {
-                      _showPdfPreview(evaluasi);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'view',
-                      child: Row(
-                        children: [
-                          Icon(Icons.visibility_outlined, size: 18, color: AppColors.primaryBlue),
-                          SizedBox(width: 12),
-                          Text('Lihat Detail'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'pdf',
-                      child: Row(
-                        children: [
-                          Icon(Icons.picture_as_pdf_outlined, size: 18, color: Color(0xFFEF4444)),
-                          SizedBox(width: 12),
-                          Text('Export PDF'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_outlined, size: 18),
-                          SizedBox(width: 12),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuDivider(height: 1),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
-                          SizedBox(width: 12),
-                          Text('Hapus', style: TextStyle(color: Color(0xFFEF4444))),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],

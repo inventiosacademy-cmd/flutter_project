@@ -127,19 +127,6 @@ class _SettingsContentState extends State<SettingsContent> {
               ],
             ),
           ),
-          // Edit Icon
-          IconButton(
-            onPressed: () => _showEditProfileDialog(context, authProvider),
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primaryBlue),
-            ),
-          ),
         ],
       ),
     );

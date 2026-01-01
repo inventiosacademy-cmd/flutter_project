@@ -112,7 +112,7 @@ class _DashboardContentState extends State<DashboardContent> {
                     ElevatedButton.icon(
                       onPressed: widget.onTambahKaryawan,
                       icon: const Icon(Icons.add, size: 18),
-                      label: const Text("Tambah"),
+                      label: const Text("Tambah Karyawan"),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryBlue,
                         foregroundColor: Colors.white,
@@ -210,7 +210,7 @@ class _DashboardContentState extends State<DashboardContent> {
                             });
                           },
                           decoration: InputDecoration(
-                            hintText: "Cari nama karyawan, ID, atau posisi...",
+                            hintText: "Cari nama karyawan",
                             hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                             prefixIcon: Icon(Icons.search, color: Colors.grey.shade400, size: 20),
                             filled: true,
