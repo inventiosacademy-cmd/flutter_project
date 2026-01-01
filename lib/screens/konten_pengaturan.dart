@@ -423,42 +423,37 @@ class _SettingsContentState extends State<SettingsContent> {
       return;
     }
 
-    final emailPengirimController = TextEditingController();
-    final passwordAplikasiController = TextEditingController();
-    final emailPenerimaController = TextEditingController(text: userEmail);
+    final emailPenerimaController = TextEditingController();
     bool isLoading = true;
     bool isSaving = false;
-    bool obscurePassword = true;
 
-    // Load GLOBAL settings for Sender, and set INDIVIDUAL for Receiver
+    // Load user's own notification settings (email penerima only)
+    // Email pengirim and password are managed by admin in backend
     try {
-      debugPrint("DEBUG: Loading from app_settings/notifications");
-      // 1. Get Global Sender Settings
-      final globalDoc = await FirebaseFirestore.instance
-          .collection('app_settings')
+      debugPrint("DEBUG: Loading user notification settings for $uid");
+      
+      // Get user's notification settings
+      final userSettingsDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('settings')
           .doc('notifications')
           .get();
       
-      if (globalDoc.exists) {
-        final data = globalDoc.data()!;
-        emailPengirimController.text = data['emailPengirim'] ?? 'inventiosacademy@gmail.com';
-        passwordAplikasiController.text = data['passwordAplikasi'] ?? 'rsif cjgq mjkq utdz';
-        debugPrint("DEBUG: Global settings loaded: ${data['emailPengirim']}");
+      if (userSettingsDoc.exists) {
+        final data = userSettingsDoc.data()!;
+        emailPenerimaController.text = data['emailPenerima'] ?? userEmail;
+        debugPrint("DEBUG: User settings loaded: ${data['emailPenerima']}");
       } else {
-        // Set default values if no global settings exist
-        emailPengirimController.text = 'inventiosacademy@gmail.com';
-        passwordAplikasiController.text = 'rsif cjgq mjkq utdz';
-        debugPrint("DEBUG: Using default email settings");
+        // Default to user's email if no settings exist
+        emailPenerimaController.text = userEmail;
+        debugPrint("DEBUG: No settings found, using user email");
       }
-
-      // 2. Always override Receiver with current user email as requested
-      emailPenerimaController.text = userEmail;
       
       isLoading = false;
     } catch (e) {
-      // Set default values on error
-      emailPengirimController.text = 'inventiosacademy@gmail.com';
-      passwordAplikasiController.text = 'rsif cjgq mjkq utdz';
+      debugPrint("DEBUG: Error loading settings: $e");
+      // Set default to user email on error
       emailPenerimaController.text = userEmail;
       isLoading = false;
     }
@@ -500,7 +495,7 @@ class _SettingsContentState extends State<SettingsContent> {
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                "Gunakan App Password Gmail, bukan password biasa",
+                                "Atur email Anda untuk menerima notifikasi PKWT yang akan segera berakhir",
                                 style: TextStyle(fontSize: 12, color: AppColors.primaryBlue),
                               ),
                             ),
@@ -509,65 +504,12 @@ class _SettingsContentState extends State<SettingsContent> {
                       ),
                       const SizedBox(height: 20),
                       TextField(
-                        controller: emailPengirimController,
-                        decoration: InputDecoration(
-                          labelText: "Email Pengirim (Gmail)",
-                          hintText: "contoh@gmail.com",
-                          prefixIcon: const Icon(Icons.alternate_email),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: passwordAplikasiController,
-                        obscureText: obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: "App Password Gmail",
-                          hintText: "xxxx xxxx xxxx xxxx",
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
-                            onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () {
-                          // Open Google App Password page info
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Buka: myaccount.google.com > Security > 2-Step Verification > App Passwords"),
-                              duration: Duration(seconds: 5),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          "Cara membuat App Password →",
-                          style: TextStyle(
-                            color: AppColors.primaryBlue,
-                            fontSize: 12,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
                         controller: emailPenerimaController,
-                        readOnly: true, // "Set otomatis" - locked to current user
                         decoration: InputDecoration(
                           labelText: "Email Penerima Notifikasi",
-                          hintText: "hr@company.com",
+                          hintText: "your.email@gmail.com",
                           prefixIcon: const Icon(Icons.mark_email_read_outlined),
-                          helperText: "Otomatis diatur ke email Anda",
-                          fillColor: Colors.grey.shade50,
-                          filled: true,
+                          helperText: "Email Anda untuk menerima notifikasi",
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -590,7 +532,7 @@ class _SettingsContentState extends State<SettingsContent> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              "• Setiap hari jam 08:00 WIB\n• H-30, H-14, H-7, H-3, H-1 sebelum PKWT berakhir",
+                              "• Setiap hari jam 08:00 WIB\n• Untuk karyawan dengan PKWT ≤ 30 hari",
                               style: TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],
@@ -612,12 +554,10 @@ class _SettingsContentState extends State<SettingsContent> {
               onPressed: isSaving
                   ? null
                   : () async {
-                      if (emailPengirimController.text.isEmpty ||
-                          passwordAplikasiController.text.isEmpty ||
-                          emailPenerimaController.text.isEmpty) {
+                      if (emailPenerimaController.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text("Semua field harus diisi"),
+                            content: Text("Email penerima harus diisi"),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -635,26 +575,10 @@ class _SettingsContentState extends State<SettingsContent> {
                         }
                         
                         final activeUid = currentUser.uid;
-                        debugPrint("DEBUG: Saving settings for user $activeUid (${currentUser.email})");
+                        debugPrint("DEBUG: Saving notification settings for user $activeUid");
 
-                        // 1. Save Global Sender Settings
-                        debugPrint("DEBUG: Saving to app_settings/notifications...");
-                        try {
-                          await FirebaseFirestore.instance
-                              .collection('app_settings')
-                              .doc('notifications')
-                              .set({
-                            'emailPengirim': emailPengirimController.text.trim(),
-                            'passwordAplikasi': passwordAplikasiController.text.trim(),
-                            'updatedAt': FieldValue.serverTimestamp(),
-                          }, SetOptions(merge: true));
-                          debugPrint("DEBUG: Global settings saved successfully");
-                        } catch (e) {
-                          debugPrint("DEBUG: Global settings FAILED: $e");
-                          throw "Gagal menyimpan pengirim (Global): $e";
-                        }
-
-                        // 2. Save Individual Receiver Preference
+                        // Save Individual Receiver Preference only
+                        // Email pengirim and password are managed by admin in backend
                         debugPrint("DEBUG: Saving to users/$activeUid/settings/notifications...");
                         try {
                           await FirebaseFirestore.instance
@@ -671,7 +595,7 @@ class _SettingsContentState extends State<SettingsContent> {
                           debugPrint("DEBUG: User settings saved successfully");
                         } catch (e) {
                           debugPrint("DEBUG: User settings FAILED: $e");
-                          throw "Gagal menyimpan penerima (Individu): $e";
+                          throw "Gagal menyimpan pengaturan email: $e";
                         }
 
                         if (context.mounted) {
