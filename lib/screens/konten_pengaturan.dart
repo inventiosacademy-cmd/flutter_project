@@ -454,9 +454,14 @@ class _SettingsContentState extends State<SettingsContent> {
       
       if (globalDoc.exists) {
         final data = globalDoc.data()!;
-        emailPengirimController.text = data['emailPengirim'] ?? '';
-        passwordAplikasiController.text = data['passwordAplikasi'] ?? '';
+        emailPengirimController.text = data['emailPengirim'] ?? 'inventiosacademy@gmail.com';
+        passwordAplikasiController.text = data['passwordAplikasi'] ?? 'rsif cjgq mjkq utdz';
         debugPrint("DEBUG: Global settings loaded: ${data['emailPengirim']}");
+      } else {
+        // Set default values if no global settings exist
+        emailPengirimController.text = 'inventiosacademy@gmail.com';
+        passwordAplikasiController.text = 'rsif cjgq mjkq utdz';
+        debugPrint("DEBUG: Using default email settings");
       }
 
       // 2. Always override Receiver with current user email as requested
@@ -464,6 +469,10 @@ class _SettingsContentState extends State<SettingsContent> {
       
       isLoading = false;
     } catch (e) {
+      // Set default values on error
+      emailPengirimController.text = 'inventiosacademy@gmail.com';
+      passwordAplikasiController.text = 'rsif cjgq mjkq utdz';
+      emailPenerimaController.text = userEmail;
       isLoading = false;
     }
 
@@ -820,10 +829,10 @@ class _SettingsContentState extends State<SettingsContent> {
         return;
       }
 
-      // Call the test function URL
-      const functionUrl = "https://asia-southeast2-hr-bagong.cloudfunctions.net/testEmailNotification";
-      
-      final response = await http.get(Uri.parse(functionUrl));
+      // Call the test function URL with userId parameter
+    final functionUrl = "https://asia-southeast2-hr-bagong.cloudfunctions.net/testEmailNotification?userId=$uid";
+    
+    final response = await http.get(Uri.parse(functionUrl));
       
       if (context.mounted) {
         Navigator.pop(context); // Close loading

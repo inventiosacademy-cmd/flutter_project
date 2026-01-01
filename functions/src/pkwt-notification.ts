@@ -24,14 +24,6 @@ interface NotificationSettings {
     hariSebelumExpired: number[];
 }
 
-// Default settings (bisa diubah di Firestore)
-const DEFAULT_SETTINGS: NotificationSettings = {
-    emailPenerima: "",
-    emailPengirim: "",
-    passwordAplikasi: "",
-    hariSebelumExpired: [30, 14, 7, 3, 1], // Kirim notifikasi H-30, H-14, H-7, H-3, H-1
-};
-
 /**
  * Fungsi untuk menghitung hari menuju expired
  */
@@ -152,6 +144,7 @@ function createEmailTemplate(employees: Array<Employee & { hariExpired: number }
 
 /**
  * Scheduled function - berjalan setiap hari jam 08:00 WIB (01:00 UTC)
+ * Sends per-user email notifications for employees with PKWT expiring soon
  */
 export const sendPkwtExpirationNotification = onSchedule(
     {
@@ -160,94 +153,152 @@ export const sendPkwtExpirationNotification = onSchedule(
         region: "asia-southeast2", // Region Indonesia
     },
     async () => {
-        console.log("🚀 Starting PKWT expiration check...");
+        console.log("🚀 Starting PKWT expiration check (per-user notifications)...");
 
         const db = admin.firestore();
 
         try {
-            // 1. Get notification settings from Firestore
-            const settingsDoc = await db.collection("settings").doc("notifications").get();
-            const settings: NotificationSettings = settingsDoc.exists
-                ? { ...DEFAULT_SETTINGS, ...settingsDoc.data() as Partial<NotificationSettings> }
-                : DEFAULT_SETTINGS;
+            // 1. Get GLOBAL sender settings
+            const globalSettingsDoc = await db.collection("app_settings").doc("notifications").get();
 
-            if (!settings.emailPengirim || !settings.passwordAplikasi || !settings.emailPenerima) {
-                console.error("❌ Email settings not configured. Please set up in Firestore.");
+            if (!globalSettingsDoc.exists) {
+                console.error("❌ Global email settings not found in app_settings/notifications");
                 return;
             }
+
+            const globalData = globalSettingsDoc.data()!;
+            const emailPengirim = globalData.emailPengirim || "";
+            const passwordAplikasi = globalData.passwordAplikasi || "";
+
+            if (!emailPengirim || !passwordAplikasi) {
+                console.error("❌ Sender email or password not configured in app_settings/notifications");
+                return;
+            }
+
+            console.log(`📧 Using sender email: ${emailPengirim}`);
 
             // 2. Get all users
             const usersSnapshot = await db.collection("users").get();
+            console.log(`👥 Found ${usersSnapshot.docs.length} users to check`);
 
-            const allExpiringEmployees: Array<Employee & { hariExpired: number; userId: string }> = [];
+            let totalEmailsSent = 0;
+            let totalUsersNotified = 0;
 
-            // 3. For each user, check employees with expiring PKWT
+            // 3. For each user, check their employees and send individual email
             for (const userDoc of usersSnapshot.docs) {
-                const employeesSnapshot = await db
-                    .collection("users")
-                    .doc(userDoc.id)
-                    .collection("employees")
-                    .get();
+                const userId = userDoc.id;
 
-                for (const empDoc of employeesSnapshot.docs) {
-                    const emp = empDoc.data() as Employee;
-                    const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
+                try {
+                    // Get user-specific notification settings
+                    const userSettingsDoc = await db
+                        .collection("users")
+                        .doc(userId)
+                        .collection("settings")
+                        .doc("notifications")
+                        .get();
 
-                    // Check if this is a notification day (H-30, H-14, H-7, H-3, H-1)
-                    if (settings.hariSebelumExpired.includes(hariExpired)) {
-                        allExpiringEmployees.push({
-                            ...emp,
-                            hariExpired,
-                            userId: userDoc.id,
-                        });
+                    if (!userSettingsDoc.exists) {
+                        console.log(`⏭️  User ${userId}: No notification settings configured, skipping`);
+                        continue;
                     }
+
+                    const userSettings = userSettingsDoc.data()!;
+                    const emailPenerima = userSettings.emailPenerima || "";
+                    const hariSebelumExpired = userSettings.hariSebelumExpired || [30, 14, 7, 3, 1];
+
+                    if (!emailPenerima) {
+                        console.log(`⏭️  User ${userId}: No recipient email configured, skipping`);
+                        continue;
+                    }
+
+                    // Get this user's employees
+                    const employeesSnapshot = await db
+                        .collection("users")
+                        .doc(userId)
+                        .collection("employees")
+                        .get();
+
+                    const expiringEmployees: Array<Employee & { hariExpired: number }> = [];
+
+                    // Check each employee for expiration
+                    for (const empDoc of employeesSnapshot.docs) {
+                        const emp = empDoc.data() as Employee;
+                        const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
+
+                        // Include ALL employees with PKWT expiring within 30 days
+                        if (hariExpired >= 0 && hariExpired <= 30) {
+                            expiringEmployees.push({ ...emp, hariExpired });
+                        }
+                    }
+
+                    if (expiringEmployees.length === 0) {
+                        console.log(`✅ User ${userId}: No employees to notify today`);
+                        continue;
+                    }
+
+                    // Sort by days remaining (most urgent first)
+                    expiringEmployees.sort((a, b) => a.hariExpired - b.hariExpired);
+
+                    console.log(`📋 User ${userId}: Found ${expiringEmployees.length} employees to notify`);
+
+                    // Send email to this user
+                    const transporter = createEmailTransporter({
+                        emailPengirim,
+                        passwordAplikasi,
+                        emailPenerima,
+                        hariSebelumExpired,
+                    });
+
+                    const emailHtml = createEmailTemplate(expiringEmployees);
+
+                    const mailOptions = {
+                        from: `"HR Dashboard" <${emailPengirim}>`,
+                        to: emailPenerima,
+                        subject: `⚠️ [HR Dashboard] ${expiringEmployees.length} Karyawan dengan PKWT Segera Berakhir`,
+                        html: emailHtml,
+                    };
+
+                    await transporter.sendMail(mailOptions);
+
+                    console.log(`✅ User ${userId}: Email sent successfully to ${emailPenerima}`);
+                    totalEmailsSent++;
+                    totalUsersNotified++;
+
+                    // Log notification for this user
+                    await db.collection("notification_logs").add({
+                        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                        userId: userId,
+                        recipientEmail: emailPenerima,
+                        employeeCount: expiringEmployees.length,
+                        employees: expiringEmployees.map((e) => ({
+                            nama: e.nama,
+                            hariExpired: e.hariExpired,
+                        })),
+                        status: "success",
+                    });
+
+                } catch (userError) {
+                    console.error(`❌ Error processing user ${userId}:`, userError);
+
+                    // Log error for this user
+                    await db.collection("notification_logs").add({
+                        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                        userId: userId,
+                        status: "error",
+                        error: String(userError),
+                    });
                 }
             }
 
-            console.log(`📋 Found ${allExpiringEmployees.length} employees with PKWT expiring on notification days`);
-
-            if (allExpiringEmployees.length === 0) {
-                console.log("✅ No notifications to send today");
-                return;
-            }
-
-            // 4. Sort by days remaining (most urgent first)
-            allExpiringEmployees.sort((a, b) => a.hariExpired - b.hariExpired);
-
-            // 5. Send email
-            const transporter = createEmailTransporter(settings);
-            const emailHtml = createEmailTemplate(allExpiringEmployees);
-
-            const mailOptions = {
-                from: `"HR Dashboard" <${settings.emailPengirim}>`,
-                to: settings.emailPenerima,
-                subject: `⚠️ [HR Dashboard] ${allExpiringEmployees.length} Karyawan dengan PKWT Segera Berakhir`,
-                html: emailHtml,
-            };
-
-            await transporter.sendMail(mailOptions);
-
-            console.log(`✅ Email sent successfully to ${settings.emailPenerima}`);
-
-            // 6. Log notification history
-            await db.collection("notification_logs").add({
-                sentAt: admin.firestore.FieldValue.serverTimestamp(),
-                recipientEmail: settings.emailPenerima,
-                employeeCount: allExpiringEmployees.length,
-                employees: allExpiringEmployees.map((e) => ({
-                    nama: e.nama,
-                    hariExpired: e.hariExpired,
-                })),
-                status: "success",
-            });
+            console.log(`✅ Notification run completed: ${totalEmailsSent} emails sent to ${totalUsersNotified} users`);
 
         } catch (error) {
-            console.error("❌ Error sending notification:", error);
+            console.error("❌ Critical error in notification system:", error);
 
-            // Log error
+            // Log critical error
             await db.collection("notification_logs").add({
                 sentAt: admin.firestore.FieldValue.serverTimestamp(),
-                status: "error",
+                status: "critical_error",
                 error: String(error),
             });
         }
@@ -256,6 +307,7 @@ export const sendPkwtExpirationNotification = onSchedule(
 
 /**
  * HTTP function untuk testing (bisa dipanggil manual)
+ * Tests email notification for a specific user (from query param) or first user with settings
  */
 export const testEmailNotification = onRequest(
     {
@@ -263,50 +315,131 @@ export const testEmailNotification = onRequest(
         cors: true, // Enable CORS untuk akses dari web/app
     },
     async (req, res) => {
-        console.log("🧪 Testing email notification...");
+        console.log("🧪 Testing email notification (per-user)...");
 
         const db = admin.firestore();
 
         try {
-            // Get settings
-            const settingsDoc = await db.collection("settings").doc("notifications").get();
-            const settings: NotificationSettings = settingsDoc.exists
-                ? { ...DEFAULT_SETTINGS, ...settingsDoc.data() as Partial<NotificationSettings> }
-                : DEFAULT_SETTINGS;
+            // Get userId from query parameter (sent from Flutter app)
+            const requestedUserId = req.query.userId as string || "";
 
-            if (!settings.emailPengirim || !settings.passwordAplikasi || !settings.emailPenerima) {
+            if (requestedUserId) {
+                console.log(`📱 Testing for specific user: ${requestedUserId}`);
+            }
+
+            // 1. Get GLOBAL sender settings
+            const globalSettingsDoc = await db.collection("app_settings").doc("notifications").get();
+
+            if (!globalSettingsDoc.exists) {
                 res.status(400).json({
                     success: false,
-                    message: "Email settings not configured. Please set emailPengirim, passwordAplikasi, and emailPenerima in Firestore: settings/notifications",
+                    message: "Global email settings not found. Please configure in app_settings/notifications",
                 });
                 return;
             }
 
-            // Get all expiring employees (within 30 days)
-            const usersSnapshot = await db.collection("users").get();
-            const allExpiringEmployees: Array<Employee & { hariExpired: number }> = [];
+            const globalData = globalSettingsDoc.data()!;
+            const emailPengirim = globalData.emailPengirim || "";
+            const passwordAplikasi = globalData.passwordAplikasi || "";
 
-            for (const userDoc of usersSnapshot.docs) {
-                const employeesSnapshot = await db
+            if (!emailPengirim || !passwordAplikasi) {
+                res.status(400).json({
+                    success: false,
+                    message: "Sender email or password not configured in app_settings/notifications",
+                });
+                return;
+            }
+
+            // 2. Determine which user to test
+            let testUserId: string | null = null;
+            let emailPenerima = "";
+
+            if (requestedUserId) {
+                // Test for specific user (from Flutter app)
+                const userSettingsDoc = await db
                     .collection("users")
-                    .doc(userDoc.id)
-                    .collection("employees")
+                    .doc(requestedUserId)
+                    .collection("settings")
+                    .doc("notifications")
                     .get();
 
-                for (const empDoc of employeesSnapshot.docs) {
-                    const emp = empDoc.data() as Employee;
-                    const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
+                if (userSettingsDoc.exists) {
+                    const userSettings = userSettingsDoc.data()!;
+                    emailPenerima = userSettings.emailPenerima || "";
 
-                    if (hariExpired >= 0 && hariExpired <= 30) {
-                        allExpiringEmployees.push({ ...emp, hariExpired });
+                    if (emailPenerima) {
+                        testUserId = requestedUserId;
+                    } else {
+                        res.status(400).json({
+                            success: false,
+                            message: `User ${requestedUserId} has no recipient email configured. Please set up in Pengaturan.`,
+                        });
+                        return;
                     }
+                } else {
+                    res.status(400).json({
+                        success: false,
+                        message: `User ${requestedUserId} has no notification settings. Please set up in Pengaturan.`,
+                    });
+                    return;
+                }
+            } else {
+                // Fallback: Find first user with notification settings
+                const usersSnapshot = await db.collection("users").get();
+
+                for (const userDoc of usersSnapshot.docs) {
+                    const userSettingsDoc = await db
+                        .collection("users")
+                        .doc(userDoc.id)
+                        .collection("settings")
+                        .doc("notifications")
+                        .get();
+
+                    if (userSettingsDoc.exists) {
+                        const userSettings = userSettingsDoc.data()!;
+                        emailPenerima = userSettings.emailPenerima || "";
+
+                        if (emailPenerima) {
+                            testUserId = userDoc.id;
+                            break;
+                        }
+                    }
+                }
+
+                if (!testUserId) {
+                    res.status(400).json({
+                        success: false,
+                        message: "No users found with email notification settings configured. Please set up in Pengaturan.",
+                    });
+                    return;
+                }
+            }
+
+            console.log(`📧 Testing with user ${testUserId}, recipient: ${emailPenerima}`);
+
+            // 3. Get expiring employees for this test user (within 30 days)
+            const employeesSnapshot = await db
+                .collection("users")
+                .doc(testUserId!) // Use testUserId which is guaranteed to be not null here
+                .collection("employees")
+                .get();
+
+            const allExpiringEmployees: Array<Employee & { hariExpired: number }> = [];
+
+            for (const empDoc of employeesSnapshot.docs) {
+                const emp = empDoc.data() as Employee;
+                const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
+
+                if (hariExpired >= 0 && hariExpired <= 30) {
+                    allExpiringEmployees.push({ ...emp, hariExpired });
                 }
             }
 
             if (allExpiringEmployees.length === 0) {
                 res.json({
                     success: true,
-                    message: "No employees with PKWT expiring within 30 days",
+                    message: `No employees with PKWT expiring within 30 days for user ${testUserId}`,
+                    userId: testUserId,
                 });
                 return;
             }
@@ -314,19 +447,26 @@ export const testEmailNotification = onRequest(
             // Sort and send
             allExpiringEmployees.sort((a, b) => a.hariExpired - b.hariExpired);
 
-            const transporter = createEmailTransporter(settings);
+            const transporter = createEmailTransporter({
+                emailPengirim,
+                passwordAplikasi,
+                emailPenerima,
+                hariSebelumExpired: [30, 14, 7, 3, 1],
+            });
+
             const emailHtml = createEmailTemplate(allExpiringEmployees);
 
             await transporter.sendMail({
-                from: `"HR Dashboard" <${settings.emailPengirim}>`,
-                to: settings.emailPenerima,
+                from: `"HR Dashboard" <${emailPengirim}>`,
+                to: emailPenerima,
                 subject: `🧪 [TEST] ${allExpiringEmployees.length} Karyawan dengan PKWT Segera Berakhir`,
                 html: emailHtml,
             });
 
             res.json({
                 success: true,
-                message: `Test email sent to ${settings.emailPenerima}`,
+                message: `Test email sent to ${emailPenerima}`,
+                userId: testUserId,
                 employeeCount: allExpiringEmployees.length,
                 employees: allExpiringEmployees.map((e) => ({
                     nama: e.nama,
