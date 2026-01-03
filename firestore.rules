@@ -1,10 +1,71 @@
- rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // MODE TOTAL OPEN (Hanya untuk Tes 5 Menit)
-    match /{allPaths=**} {
-      allow read, write: if true;
+    // Helper function untuk check authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function untuk check ownership
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // --- USERS COLLECTION ---
+    // Menyimpan profil user dan data terkait (subcollections)
+    // Ref: lib/providers/prov_auth.dart
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      // --- EMPLOYEES SUBCOLLECTION ---
+      // Menyimpan data karyawan per user
+      // Ref: lib/providers/prov_karyawan.dart
+      match /employees/{employeeId} {
+        allow read, write: if isOwner(userId);
+        
+        // --- PKWT DOCUMENTS SUBCOLLECTION ---
+        // Menyimpan metadata dokumen PKWT
+        // Ref: lib/providers/prov_pkwt.dart
+        match /pkwt_documents/{docId} {
+          // Allow read and create untuk owner
+          allow read, create: if isOwner(userId);
+          
+          // Allow update hanya untuk field tertentu (jika diperlukan di masa depan)
+          allow update: if isOwner(userId) 
+            && request.resource.data.employeeId == resource.data.employeeId
+            && request.resource.data.id == resource.data.id;
+          
+          // NO DELETE - sesuai requirement keamanan data
+          allow delete: if false;
+        }
+      }
+      
+      // --- EVALUASI SUBCOLLECTION ---
+      // Menyimpan data evaluasi kinerja karyawan
+      // Ref: lib/providers/prov_evaluasi.dart
+      match /evaluasi/{evaluasiId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // --- USER SETTINGS SUBCOLLECTION ---
+      // Menyimpan pengaturan spesifik user (e.g., notifikasi)
+      // Ref: lib/screens/konten_pengaturan.dart
+      match /settings/{settingId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // --- GLOBAL APP SETTINGS ---
+    // Pengaturan global aplikasi (e.g., email pengirim notifikasi)
+    // Ref: lib/screens/konten_pengaturan.dart (_testSendEmail)
+    match /app_settings/{settingId} {
+      // User authenticated bisa baca (untuk settings publik/shared)
+      allow read: if isAuthenticated();
+      
+      // WRITE BLOCKED: Hanya bisa diubah lewat Firebase Console / Admin SDK
+      // Mencegah user biasa mengubah konfigurasi global
+      allow write: if false;
     }
   }
 }

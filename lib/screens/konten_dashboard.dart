@@ -43,6 +43,15 @@ class _DashboardContentState extends State<DashboardContent> {
 
   String _selectedEvaluasi = 'Semua';
 
+  // Helper function to truncate name to first 2 words
+  String _truncateName(String fullName) {
+    final words = fullName.trim().split(RegExp(r'\s+'));
+    if (words.length <= 2) {
+      return fullName;
+    }
+    return '${words[0]} ${words[1]}';
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -295,6 +304,9 @@ class _DashboardContentState extends State<DashboardContent> {
                         }).toList();
                       }
 
+                      // Sort alphabetically by name
+                      employees.sort((a, b) => a.nama.toLowerCase().compareTo(b.nama.toLowerCase()));
+
                       if (data.isLoading) {
                         return Container(
                           padding: const EdgeInsets.all(40),
@@ -384,6 +396,9 @@ class _DashboardContentState extends State<DashboardContent> {
                           return true;
                         }).toList();
                       }
+
+                      // Sort alphabetically by name
+                      filteredEmployees.sort((a, b) => a.nama.toLowerCase().compareTo(b.nama.toLowerCase()));
                       
                       final totalItems = filteredEmployees.length;
                       final totalPages = totalItems == 0 ? 1 : (totalItems / _itemsPerPage).ceil();
@@ -681,22 +696,26 @@ class _DashboardContentState extends State<DashboardContent> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      emp.nama,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1E293B),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _truncateName(emp.nama),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E293B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    Text(
-                      emp.posisi,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                    ),
-                  ],
+                      Text(
+                        emp.posisi,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -1,0 +1,41 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function untuk check authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function untuk check ownership
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function untuk validate PDF file
+    function isValidPdf() {
+      return request.resource.contentType == 'application/pdf';
+    }
+    
+    // PKWT Documents Storage
+    match /users/{userId}/employees/{employeeId}/pkwt/{fileName} {
+      // Allow read untuk owner
+      allow read: if isOwner(userId);
+      
+      // Allow upload (create) untuk owner dengan validasi PDF
+      allow create: if isOwner(userId) 
+        && isValidPdf();
+      
+      // NO UPDATE - file tidak bisa diupdate, hanya create baru
+      allow update: if false;
+      
+      // NO DELETE - sesuai requirement
+      allow delete: if false;
+    }
+    
+    // Block semua akses lain
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
