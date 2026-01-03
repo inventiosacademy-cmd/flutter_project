@@ -143,8 +143,40 @@ function createEmailTemplate(employees: Array<Employee & { hariExpired: number }
 }
 
 /**
+ * Helper function to check if an employee has been evaluated
+ */
+async function isEmployeeEvaluated(db: admin.firestore.Firestore, userId: string, employeeId: string): Promise<boolean> {
+    const evaluationsSnapshot = await db
+        .collection("users")
+        .doc(userId)
+        .collection("evaluasi")  // ← Changed from "evaluations" to "evaluasi"
+        .where("employeeId", "==", employeeId)
+        .get();
+
+    console.log(`🔍 Checking evaluation status for employee ${employeeId}: Found ${evaluationsSnapshot.docs.length} evaluation(s)`);
+
+    // Employee is considered evaluated if there's at least one evaluation
+    // that is NOT in draft status (status: belumTTD or selesai)
+    for (const evalDoc of evaluationsSnapshot.docs) {
+        const evalData = evalDoc.data();
+        const status = evalData.status || "";
+
+        console.log(`  📋 Evaluation ID: ${evalDoc.id}, Status: "${status}"`);
+
+        // If there's a completed evaluation (not draft), employee is evaluated
+        if (status === "belumTTD" || status === "selesai") {
+            console.log(`  ✅ Employee ${employeeId} is EVALUATED (status: ${status})`);
+            return true;
+        }
+    }
+
+    console.log(`  ❌ Employee ${employeeId} is NOT evaluated (no completed evaluations found)`);
+    return false;
+}
+
+/**
  * Scheduled function - berjalan setiap hari jam 08:00 WIB (01:00 UTC)
- * Sends per-user email notifications for employees with PKWT expiring soon
+ * Sends individual email notifications for each employee with PKWT expiring soon and not yet evaluated
  */
 export const sendPkwtExpirationNotification = onSchedule(
     {
@@ -153,7 +185,7 @@ export const sendPkwtExpirationNotification = onSchedule(
         region: "asia-southeast2", // Region Indonesia
     },
     async () => {
-        console.log("🚀 Starting PKWT expiration check (per-user notifications)...");
+        console.log("🚀 Starting PKWT expiration check (individual employee notifications)...");
 
         const db = admin.firestore();
 
@@ -182,9 +214,9 @@ export const sendPkwtExpirationNotification = onSchedule(
             console.log(`👥 Found ${usersSnapshot.docs.length} users to check`);
 
             let totalEmailsSent = 0;
-            let totalUsersNotified = 0;
+            let totalEmployeesNotified = 0;
 
-            // 3. For each user, check their employees and send individual email
+            // 3. For each user, check their employees and send individual email per employee
             for (const userDoc of usersSnapshot.docs) {
                 const userId = userDoc.id;
 
@@ -204,7 +236,6 @@ export const sendPkwtExpirationNotification = onSchedule(
 
                     const userSettings = userSettingsDoc.data()!;
                     const emailPenerima = userSettings.emailPenerima || "";
-                    const hariSebelumExpired = userSettings.hariSebelumExpired || [30, 14, 7, 3, 1];
 
                     if (!emailPenerima) {
                         console.log(`⏭️  User ${userId}: No recipient email configured, skipping`);
@@ -218,64 +249,92 @@ export const sendPkwtExpirationNotification = onSchedule(
                         .collection("employees")
                         .get();
 
-                    const expiringEmployees: Array<Employee & { hariExpired: number }> = [];
+                    const unevaluatedExpiringEmployees: Array<Employee & { hariExpired: number }> = [];
 
-                    // Check each employee for expiration
+                    // Check each employee for expiration AND evaluation status
                     for (const empDoc of employeesSnapshot.docs) {
                         const emp = empDoc.data() as Employee;
                         const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
 
-                        // Include ALL employees with PKWT expiring within 30 days
+                        // Only include employees with PKWT expiring within 30 days
                         if (hariExpired >= 0 && hariExpired <= 30) {
-                            expiringEmployees.push({ ...emp, hariExpired });
+                            // Check if employee has been evaluated
+                            const hasBeenEvaluated = await isEmployeeEvaluated(db, userId, empDoc.id);
+
+                            // Only add if NOT evaluated
+                            if (!hasBeenEvaluated) {
+                                unevaluatedExpiringEmployees.push({
+                                    ...emp,
+                                    id: empDoc.id,
+                                    hariExpired
+                                });
+                            }
                         }
                     }
 
-                    if (expiringEmployees.length === 0) {
-                        console.log(`✅ User ${userId}: No employees to notify today`);
+                    if (unevaluatedExpiringEmployees.length === 0) {
+                        console.log(`✅ User ${userId}: No unevaluated employees to notify`);
                         continue;
                     }
 
                     // Sort by days remaining (most urgent first)
-                    expiringEmployees.sort((a, b) => a.hariExpired - b.hariExpired);
+                    unevaluatedExpiringEmployees.sort((a, b) => a.hariExpired - b.hariExpired);
 
-                    console.log(`📋 User ${userId}: Found ${expiringEmployees.length} employees to notify`);
+                    console.log(`📋 User ${userId}: Found ${unevaluatedExpiringEmployees.length} unevaluated employees to notify`);
 
-                    // Send email to this user
+                    // Create email transporter
                     const transporter = createEmailTransporter({
                         emailPengirim,
                         passwordAplikasi,
                         emailPenerima,
-                        hariSebelumExpired,
+                        hariSebelumExpired: [30, 14, 7, 3, 1],
                     });
 
-                    const emailHtml = createEmailTemplate(expiringEmployees);
+                    // Send ONE EMAIL PER EMPLOYEE
+                    for (const employee of unevaluatedExpiringEmployees) {
+                        try {
+                            // Create email template for single employee
+                            const emailHtml = createEmailTemplate([employee]);
 
-                    const mailOptions = {
-                        from: `"HR Dashboard" <${emailPengirim}>`,
-                        to: emailPenerima,
-                        subject: `⚠️ [HR Dashboard] ${expiringEmployees.length} Karyawan dengan PKWT Segera Berakhir`,
-                        html: emailHtml,
-                    };
+                            const mailOptions = {
+                                from: `"HR Dashboard" <${emailPengirim}>`,
+                                to: emailPenerima,
+                                subject: `⚠️ [HR Dashboard] PKWT ${employee.nama} Segera Berakhir (${employee.hariExpired} Hari)`,
+                                html: emailHtml,
+                            };
 
-                    await transporter.sendMail(mailOptions);
+                            await transporter.sendMail(mailOptions);
 
-                    console.log(`✅ User ${userId}: Email sent successfully to ${emailPenerima}`);
-                    totalEmailsSent++;
-                    totalUsersNotified++;
+                            console.log(`✅ User ${userId}: Email sent for employee ${employee.nama} (${employee.hariExpired} days) to ${emailPenerima}`);
+                            totalEmailsSent++;
 
-                    // Log notification for this user
-                    await db.collection("notification_logs").add({
-                        sentAt: admin.firestore.FieldValue.serverTimestamp(),
-                        userId: userId,
-                        recipientEmail: emailPenerima,
-                        employeeCount: expiringEmployees.length,
-                        employees: expiringEmployees.map((e) => ({
-                            nama: e.nama,
-                            hariExpired: e.hariExpired,
-                        })),
-                        status: "success",
-                    });
+                            // Log notification for this employee
+                            await db.collection("notification_logs").add({
+                                sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                                userId: userId,
+                                recipientEmail: emailPenerima,
+                                employeeId: employee.id,
+                                employeeName: employee.nama,
+                                hariExpired: employee.hariExpired,
+                                status: "success",
+                            });
+
+                        } catch (emailError) {
+                            console.error(`❌ Error sending email for employee ${employee.nama}:`, emailError);
+
+                            // Log error for this specific employee
+                            await db.collection("notification_logs").add({
+                                sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                                userId: userId,
+                                employeeId: employee.id,
+                                employeeName: employee.nama,
+                                status: "error",
+                                error: String(emailError),
+                            });
+                        }
+                    }
+
+                    totalEmployeesNotified += unevaluatedExpiringEmployees.length;
 
                 } catch (userError) {
                     console.error(`❌ Error processing user ${userId}:`, userError);
@@ -290,7 +349,7 @@ export const sendPkwtExpirationNotification = onSchedule(
                 }
             }
 
-            console.log(`✅ Notification run completed: ${totalEmailsSent} emails sent to ${totalUsersNotified} users`);
+            console.log(`✅ Notification run completed: ${totalEmailsSent} emails sent for ${totalEmployeesNotified} unevaluated employees`);
 
         } catch (error) {
             console.error("❌ Critical error in notification system:", error);
@@ -308,6 +367,7 @@ export const sendPkwtExpirationNotification = onSchedule(
 /**
  * HTTP function untuk testing (bisa dipanggil manual)
  * Tests email notification for a specific user (from query param) or first user with settings
+ * Sends individual emails for each unevaluated employee
  */
 export const testEmailNotification = onRequest(
     {
@@ -315,7 +375,7 @@ export const testEmailNotification = onRequest(
         cors: true, // Enable CORS untuk akses dari web/app
     },
     async (req, res) => {
-        console.log("🧪 Testing email notification (per-user)...");
+        console.log("🧪 Testing email notification (individual employee emails)...");
 
         const db = admin.firestore();
 
@@ -417,35 +477,45 @@ export const testEmailNotification = onRequest(
 
             console.log(`📧 Testing with user ${testUserId}, recipient: ${emailPenerima}`);
 
-            // 3. Get expiring employees for this test user (within 30 days)
+            // 3. Get expiring UNEVALUATED employees for this test user (within 30 days)
             const employeesSnapshot = await db
                 .collection("users")
                 .doc(testUserId!) // Use testUserId which is guaranteed to be not null here
                 .collection("employees")
                 .get();
 
-            const allExpiringEmployees: Array<Employee & { hariExpired: number }> = [];
+            const unevaluatedExpiringEmployees: Array<Employee & { hariExpired: number }> = [];
 
             for (const empDoc of employeesSnapshot.docs) {
                 const emp = empDoc.data() as Employee;
                 const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
 
                 if (hariExpired >= 0 && hariExpired <= 30) {
-                    allExpiringEmployees.push({ ...emp, hariExpired });
+                    // Check if employee has been evaluated
+                    const hasBeenEvaluated = await isEmployeeEvaluated(db, testUserId!, empDoc.id);
+
+                    // Only add if NOT evaluated
+                    if (!hasBeenEvaluated) {
+                        unevaluatedExpiringEmployees.push({
+                            ...emp,
+                            id: empDoc.id,
+                            hariExpired
+                        });
+                    }
                 }
             }
 
-            if (allExpiringEmployees.length === 0) {
+            if (unevaluatedExpiringEmployees.length === 0) {
                 res.json({
                     success: true,
-                    message: `No employees with PKWT expiring within 30 days for user ${testUserId}`,
+                    message: `No unevaluated employees with PKWT expiring within 30 days for user ${testUserId}`,
                     userId: testUserId,
                 });
                 return;
             }
 
-            // Sort and send
-            allExpiringEmployees.sort((a, b) => a.hariExpired - b.hariExpired);
+            // Sort by most urgent first
+            unevaluatedExpiringEmployees.sort((a, b) => a.hariExpired - b.hariExpired);
 
             const transporter = createEmailTransporter({
                 emailPengirim,
@@ -454,24 +524,40 @@ export const testEmailNotification = onRequest(
                 hariSebelumExpired: [30, 14, 7, 3, 1],
             });
 
-            const emailHtml = createEmailTemplate(allExpiringEmployees);
+            let emailsSent = 0;
+            const sentEmployees: Array<{ nama: string; hariExpired: number }> = [];
 
-            await transporter.sendMail({
-                from: `"HR Dashboard" <${emailPengirim}>`,
-                to: emailPenerima,
-                subject: `🧪 [TEST] ${allExpiringEmployees.length} Karyawan dengan PKWT Segera Berakhir`,
-                html: emailHtml,
-            });
+            // Send ONE EMAIL PER EMPLOYEE
+            for (const employee of unevaluatedExpiringEmployees) {
+                try {
+                    const emailHtml = createEmailTemplate([employee]);
+
+                    await transporter.sendMail({
+                        from: `"HR Dashboard" <${emailPengirim}>`,
+                        to: emailPenerima,
+                        subject: `🧪 [TEST] PKWT ${employee.nama} Segera Berakhir (${employee.hariExpired} Hari)`,
+                        html: emailHtml,
+                    });
+
+                    emailsSent++;
+                    sentEmployees.push({
+                        nama: employee.nama,
+                        hariExpired: employee.hariExpired
+                    });
+
+                    console.log(`✅ Test email sent for employee ${employee.nama}`);
+                } catch (emailError) {
+                    console.error(`❌ Error sending email for employee ${employee.nama}:`, emailError);
+                }
+            }
 
             res.json({
                 success: true,
-                message: `Test email sent to ${emailPenerima}`,
+                message: `Test emails sent: ${emailsSent} emails for ${emailsSent} unevaluated employees`,
                 userId: testUserId,
-                employeeCount: allExpiringEmployees.length,
-                employees: allExpiringEmployees.map((e) => ({
-                    nama: e.nama,
-                    hariExpired: e.hariExpired,
-                })),
+                emailsSent: emailsSent,
+                totalUnevaluatedEmployees: unevaluatedExpiringEmployees.length,
+                employees: sentEmployees,
             });
 
         } catch (error) {
