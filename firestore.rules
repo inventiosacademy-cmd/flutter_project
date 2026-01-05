@@ -56,6 +56,23 @@ service cloud.firestore {
       }
     }
     
+    // --- ACTIVITY LOGS COLLECTION ---
+    // Menyimpan audit trail aktivitas user
+    // Ref: lib/services/activity_service.dart
+    match /activity_logs/{logId} {
+      // Allow create (mencatat log) untuk user yang login
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid; // Pastikan mencatat atas nama sendiri
+      
+      // Allow read (melihat history) HANYA untuk pemilik log itu sendiri
+      // Mencegah user A mengintip aktivitas user B
+      allow read: if isAuthenticated() 
+        && resource.data.userId == request.auth.uid;
+      
+      // NO UPDATE / DELETE - Log harus permanen (Audit Trail)
+      allow update, delete: if false;
+    }
+
     // --- GLOBAL APP SETTINGS ---
     // Pengaturan global aplikasi (e.g., email pengirim notifikasi)
     // Ref: lib/screens/konten_pengaturan.dart (_testSendEmail)

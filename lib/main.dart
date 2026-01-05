@@ -52,11 +52,15 @@ class MyApp extends StatelessWidget {
               Provider.of<EvaluasiProvider>(context, listen: false).init();
             });
           }
-          return MaterialApp(
-            title: 'HR Dashboard',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            home: auth.isLoggedIn ? const MainScreen() : const LoginScreen(),
+          return Listener(
+            onPointerDown: (_) => auth.resetIdleTimer(),
+            behavior: HitTestBehavior.translucent,
+            child: MaterialApp(
+              title: 'HR Dashboard',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              home: auth.isLoggedIn ? const MainScreen() : const LoginScreen(),
+            ),
           );
         },
       ),

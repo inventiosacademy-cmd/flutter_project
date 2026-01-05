@@ -43,6 +43,14 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_options(${TARGET} PRIVATE /EHsc)
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
+  
+  # Security Hardening Flags (Windows)
+  # /GS - Buffer Security Check
+  # /DYNAMICBASE - ASLR (Address Space Layout Randomization)
+  # /NXCOMPAT - DEP (Data Execution Prevention)
+  target_compile_options(${TARGET} PRIVATE "$<$<CONFIG:Release>:/GS>")
+  target_link_options(${TARGET} PRIVATE "$<$<CONFIG:Release>:/DYNAMICBASE>")
+  target_link_options(${TARGET} PRIVATE "$<$<CONFIG:Release>:/NXCOMPAT>")
 endfunction()
 
 # Flutter library and tool build rules.

@@ -38,3 +38,19 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# --- SECURITY HARDENING ---
+if(MSVC)
+  # Compile Options
+  target_compile_options(${BINARY_NAME} PRIVATE 
+    "/GS"       # Buffer Security Check
+    "/guard:cf" # Control Flow Guard
+  )
+  
+  # Link Options (ASLR & DEP are usually on by default in modern MSVC but we force them)
+  target_link_options(${BINARY_NAME} PRIVATE 
+    "/DYNAMICBASE" # Address Space Layout Randomization (ASLR)
+    "/NXCOMPAT"    # Data Execution Prevention (DEP)
+    "/CETCOMPAT"   # Shadow Stack (if supported)
+  )
+endif()

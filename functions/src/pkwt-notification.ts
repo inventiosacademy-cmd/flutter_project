@@ -375,17 +375,44 @@ export const testEmailNotification = onRequest(
         cors: true, // Enable CORS untuk akses dari web/app
     },
     async (req, res) => {
-        console.log("🧪 Testing email notification (individual employee emails)...");
+        // SECURITY: Only allow POST requests
+        if (req.method !== "POST") {
+            res.status(405).send("Method Not Allowed");
+            return;
+        }
+
+        // SECURITY: Verify Authentication Token
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            res.status(403).json({ error: "Unauthorized: Missing or invalid token" });
+            return;
+        }
+
+        const idToken = authHeader.split("Bearer ")[1];
+        let decodedToken;
+
+        try {
+            decodedToken = await admin.auth().verifyIdToken(idToken);
+            console.log(`✅ Authenticated request from user: ${decodedToken.uid}`);
+        } catch (error) {
+            console.error("❌ Authentication failed:", error);
+            res.status(403).json({ error: "Unauthorized: Invalid token" });
+            return;
+        }
+
+        console.log("🧪 Testing email notification (secure mode)...");
 
         const db = admin.firestore();
 
         try {
-            // Get userId from query parameter (sent from Flutter app)
-            const requestedUserId = req.query.userId as string || "";
+            // Get userId from BODY (secure POST), not query param
+            const requestedUserId = req.body.userId as string || decodedToken.uid;
 
             if (requestedUserId) {
                 console.log(`📱 Testing for specific user: ${requestedUserId}`);
             }
+
+            // ... (rest of the logic remains the same, just ensure it uses requestedUserId)
 
             // 1. Get GLOBAL sender settings
             const globalSettingsDoc = await db.collection("app_settings").doc("notifications").get();
@@ -415,7 +442,13 @@ export const testEmailNotification = onRequest(
             let emailPenerima = "";
 
             if (requestedUserId) {
-                // Test for specific user (from Flutter app)
+                // Check if requesting user matches token user (or is admin) - Optional enforcement
+                if (requestedUserId !== decodedToken.uid) {
+                    console.warn(`⚠️ User ${decodedToken.uid} requested test for different user ${requestedUserId}`);
+                    // For now we allow it for testing, but in strict production you might want to block this
+                }
+
+                // Test for specific user
                 const userSettingsDoc = await db
                     .collection("users")
                     .doc(requestedUserId)
@@ -444,32 +477,26 @@ export const testEmailNotification = onRequest(
                     return;
                 }
             } else {
-                // Fallback: Find first user with notification settings
-                const usersSnapshot = await db.collection("users").get();
+                // Fallback: Use the authenticated user
+                testUserId = decodedToken.uid;
 
-                for (const userDoc of usersSnapshot.docs) {
-                    const userSettingsDoc = await db
-                        .collection("users")
-                        .doc(userDoc.id)
-                        .collection("settings")
-                        .doc("notifications")
-                        .get();
+                // Get settings for auth user
+                const userSettingsDoc = await db
+                    .collection("users")
+                    .doc(testUserId)
+                    .collection("settings")
+                    .doc("notifications")
+                    .get();
 
-                    if (userSettingsDoc.exists) {
-                        const userSettings = userSettingsDoc.data()!;
-                        emailPenerima = userSettings.emailPenerima || "";
-
-                        if (emailPenerima) {
-                            testUserId = userDoc.id;
-                            break;
-                        }
-                    }
+                if (userSettingsDoc.exists) {
+                    const userSettings = userSettingsDoc.data()!;
+                    emailPenerima = userSettings.emailPenerima || "";
                 }
 
-                if (!testUserId) {
+                if (!emailPenerima) {
                     res.status(400).json({
                         success: false,
-                        message: "No users found with email notification settings configured. Please set up in Pengaturan.",
+                        message: `User ${testUserId} has no recipient email configured. Please set up in Pengaturan.`,
                     });
                     return;
                 }
@@ -480,7 +507,7 @@ export const testEmailNotification = onRequest(
             // 3. Get expiring UNEVALUATED employees for this test user (within 30 days)
             const employeesSnapshot = await db
                 .collection("users")
-                .doc(testUserId!) // Use testUserId which is guaranteed to be not null here
+                .doc(testUserId!)
                 .collection("employees")
                 .get();
 

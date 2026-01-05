@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../providers/prov_auth.dart' as app_auth;
 import '../theme/warna.dart';
+import 'konten_riwayat_aktivitas.dart';
 
 class SettingsContent extends StatefulWidget {
   const SettingsContent({super.key});
@@ -160,6 +161,18 @@ class _SettingsContentState extends State<SettingsContent> {
             title: "Ubah Password",
             subtitle: "Ganti kata sandi akun Anda",
             onTap: () => _resetPassword(context),
+          ),
+          
+          _buildActionItem(
+            icon: Icons.history_edu,
+            title: "Riwayat Aktivitas",
+            subtitle: "Lihat log login & perubahan data",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ActivityLogScreen()),
+              );
+            },
           ),
           
           _buildSectionHeader("Notifikasi"),
@@ -740,10 +753,24 @@ class _SettingsContentState extends State<SettingsContent> {
         return;
       }
 
-      // Call the test function URL with userId parameter
-    final functionUrl = "https://asia-southeast2-hr-bagong.cloudfunctions.net/testEmailNotification?userId=$uid";
-    
-    final response = await http.get(Uri.parse(functionUrl));
+      // 3. Call the test function Securely
+      // Menggunakan POST dengan Authentication Header, bukan GET parameter
+      const functionUrl = "https://asia-southeast2-hr-bagong.cloudfunctions.net/testEmailNotification";
+      
+      final idToken = await user.getIdToken();
+      if (idToken == null) throw "Gagal mendapatkan token otentikasi.";
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          "Authorization": "Bearer $idToken",
+          "Content-Type": "application/json",
+        },
+        body: json.encode({
+          "userId": uid,
+          "testMode": true,
+        }),
+      );
       
       if (context.mounted) {
         Navigator.pop(context); // Close loading
@@ -761,28 +788,28 @@ class _SettingsContentState extends State<SettingsContent> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text("⚠️ ${data['message'] ?? 'Gagal mengirim email'}"),
+                content: const Text("⚠️ Gagal mengirim email test."),
                 backgroundColor: Colors.orange,
               ),
             );
           }
         } else {
-          final data = json.decode(response.body);
+          // SANITIZED ERROR: Jangan tampilkan raw error code ke user
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("❌ Error: ${data['error'] ?? response.statusCode}"),
+            const SnackBar(
+              content: Text("❌ Terjadi kesalahan pada server."),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
-      debugPrint("TEST EMAIL ERROR: $e");
+      debugPrint("TEST EMAIL ERROR: $e"); // Log error detail only for developer
       if (context.mounted) {
         Navigator.pop(context); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
+          const SnackBar(
+            content: Text("Gagal mengirim permintaan. Cek koneksi internet Anda."),
             backgroundColor: Colors.red,
           ),
         );
