@@ -48,6 +48,12 @@ app.*.map.json
 # SECURITY - Sensitive files to exclude
 # ============================================
 
+# Firebase configuration (contains API keys)
+lib/firebase_options.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+
 # Environment files (may contain secrets)
 .env
 .env.*
