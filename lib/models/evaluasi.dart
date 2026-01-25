@@ -49,6 +49,11 @@ class Evaluasi {
   final int izin;
   final int terlambat;
   final int mangkir;
+  
+  // Signatures
+  final String? signatureBase64; // Employee signature
+  final String hcgsAdminName; // HCGS admin name
+  final String? hcgsSignatureBase64; // HCGS signature
 
   Evaluasi({
     required this.id,
@@ -76,6 +81,9 @@ class Evaluasi {
     this.izin = 0,
     this.terlambat = 0,
     this.mangkir = 0,
+    this.signatureBase64,
+    this.hcgsAdminName = '',
+    this.hcgsSignatureBase64,
   }) : 
     ratings = ratings ?? {},
     comments = comments ?? {},
@@ -108,6 +116,9 @@ class Evaluasi {
     int? izin,
     int? terlambat,
     int? mangkir,
+    String? signatureBase64,
+    String? hcgsAdminName,
+    String? hcgsSignatureBase64,
   }) {
     return Evaluasi(
       id: id ?? this.id,
@@ -135,6 +146,9 @@ class Evaluasi {
       izin: izin ?? this.izin,
       terlambat: terlambat ?? this.terlambat,
       mangkir: mangkir ?? this.mangkir,
+      signatureBase64: signatureBase64 ?? this.signatureBase64,
+      hcgsAdminName: hcgsAdminName ?? this.hcgsAdminName,
+      hcgsSignatureBase64: hcgsSignatureBase64 ?? this.hcgsSignatureBase64,
     );
   }
   

@@ -12,6 +12,10 @@ import '../services/pkwt_upload_service.dart';
 import 'package:printing/printing.dart';
 import '../widgets/pdf_preview_dialog.dart';
 import '../widgets/pkwt_upload_dialog.dart';
+import '../widgets/evaluation_upload_dialog.dart';
+import '../providers/prov_evaluation_upload.dart';
+import '../models/evaluation_upload.dart';
+import '../services/evaluation_upload_service.dart';
 
 class KontenDetailKaryawan extends StatefulWidget {
   final Employee employee;
@@ -33,17 +37,21 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
   @override
   void initState() {
     super.initState();
-    // Initialize PKWT listener when page loads
+    // Initialize PKWT and Evaluation listeners when page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<PkwtProvider>(context, listen: false)
           .initPkwtListener(widget.employee.id);
+      Provider.of<EvaluationUploadProvider>(context, listen: false)
+          .initEvaluationListener(widget.employee.id);
     });
   }
 
   @override
   void dispose() {
-    // Cancel PKWT listener when leaving page
+    // Cancel PKWT and Evaluation listeners when leaving page
     Provider.of<PkwtProvider>(context, listen: false)
+        .cancelListener(widget.employee.id);
+    Provider.of<EvaluationUploadProvider>(context, listen: false)
         .cancelListener(widget.employee.id);
     super.dispose();
   }
@@ -313,27 +321,48 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header with Upload Button
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.assessment_outlined,
-                size: 20,
-                color: AppColors.primaryBlue,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.assessment_outlined,
+                    size: 20,
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  "Riwayat Evaluasi Karyawan",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            const Text(
-              "Riwayat Evaluasi Karyawan",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E293B),
+            ElevatedButton.icon(
+              onPressed: () {
+                EvaluationUploadDialog.show(context, widget.employee.id);
+              },
+              icon: const Icon(Icons.upload_file, size: 18),
+              label: const Text("Upload Evaluasi"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ],
@@ -342,6 +371,11 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
         
         // Timeline design for evaluations
         _buildEvaluationTimeline(),
+        
+        const SizedBox(height: 32),
+        
+        // Uploaded Evaluations Section
+        _buildUploadedEvaluationsSection(),
       ],
     );
   }
@@ -397,6 +431,10 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                     style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))
                 ),
                 DataColumn(
+                  label: Text('PKWT Ke-', 
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))
+                ),
+                DataColumn(
                   label: Text('Laporan PDF', 
                     style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))
                 ),
@@ -405,6 +443,23 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                 return DataRow(cells: [
                   DataCell(Text(DateFormat('dd MMMM yyyy').format(eval.tanggalEvaluasi),
                     style: const TextStyle(color: Color(0xFF334155)))),
+                  DataCell(
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Ke-${eval.pkwtKe}',
+                        style: TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
                   DataCell(
                     IconButton(
                       icon: Icon(Icons.picture_as_pdf, color: AppColors.error),
@@ -449,6 +504,9 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
       izin: evaluasi.izin,
       terlambat: evaluasi.terlambat,
       mangkir: evaluasi.mangkir,
+      signatureBase64: evaluasi.signatureBase64,
+      hcgsAdminName: evaluasi.hcgsAdminName.isNotEmpty ? evaluasi.hcgsAdminName : 'Admin HCGS',
+      hcgsSignatureBase64: evaluasi.hcgsSignatureBase64,
     );
 
     ModernPdfPreviewDialog.show(
@@ -601,6 +659,196 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                     ),
                   ],
                   rows: documents.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final doc = entry.value;
+                    
+                    return DataRow(cells: [
+                      DataCell(Text('${index + 1}',
+                        style: const TextStyle(color: Color(0xFF334155)))),
+                      DataCell(
+                        SizedBox(
+                          width: 200,
+                          child: Text(
+                            doc.fileName,
+                            style: const TextStyle(color: Color(0xFF334155)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${doc.pkwtKe}',
+                            style: TextStyle(
+                              color: AppColors.primaryBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      DataCell(Text(DateFormat('dd MMM yyyy').format(doc.uploadedAt),
+                        style: const TextStyle(color: Color(0xFF334155)))),
+                      DataCell(Text(doc.fileSizeFormatted,
+                        style: const TextStyle(color: Color(0xFF334155)))),
+                      DataCell(
+                        IconButton(
+                          icon: Icon(Icons.visibility, color: AppColors.primaryBlue),
+                          onPressed: () async {
+                            try {
+                              await uploadService.downloadPdf(doc.fileUrl, doc.fileName);
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error membuka PDF: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          tooltip: "Lihat PDF",
+                        ),
+                      ),
+                    ]);
+                  }).toList(),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUploadedEvaluationsSection() {
+    final uploadService = EvaluationUploadService();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.cloud_upload_outlined,
+                size: 20,
+                color: AppColors.primaryBlue,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "Dokumen Evaluasi Terupload",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        
+        // Uploaded Evaluations Table
+        Consumer<EvaluationUploadProvider>(
+          builder: (context, evalProvider, _) {
+            final uploads = evalProvider.getEvaluationsByEmployee(widget.employee.id);
+
+            if (evalProvider.isLoading) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(48),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            if (uploads.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(48),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.cloud_upload_outlined,
+                        size: 64,
+                        color: Colors.grey.shade300,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Belum ada evaluasi terupload",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Klik tombol 'Upload Evaluasi' untuk menambahkan dokumen",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: const Color(0xFFE2E8F0),
+                ),
+                child: DataTable(
+                  headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
+                  columnSpacing: 24,
+                  columns: const [
+                    DataColumn(
+                      label: Text('No', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    ),
+                    DataColumn(
+                      label: Text('Nama File', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    ),
+                    DataColumn(
+                      label: Text('PKWT Ke-', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    ),
+                    DataColumn(
+                      label: Text('Tanggal Upload', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    ),
+                    DataColumn(
+                      label: Text('Ukuran', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    ),
+                    DataColumn(
+                      label: Text('Aksi', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    ),
+                  ],
+                  rows: uploads.asMap().entries.map((entry) {
                     final index = entry.key;
                     final doc = entry.value;
                     

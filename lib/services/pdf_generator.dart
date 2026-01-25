@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:convert';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -39,6 +41,11 @@ class EvaluasiData {
   // Evaluator info
   final String namaEvaluator;
   
+  // Signatures (base64 encoded images)
+  final String? signatureBase64; // Employee signature
+  final String hcgsAdminName; // HCGS admin name
+  final String? hcgsSignatureBase64; // HCGS signature
+  
   EvaluasiData({
     required this.namaKaryawan,
     required this.posisi,
@@ -59,6 +66,9 @@ class EvaluasiData {
     this.perpanjangBulan = 6,
     this.catatan = '',
     required this.namaEvaluator,
+    this.signatureBase64,
+    this.hcgsAdminName = '',
+    this.hcgsSignatureBase64,
   });
   
   factory EvaluasiData.fromEmployee(Employee employee, {
@@ -93,6 +103,7 @@ class EvaluasiData {
       perpanjangBulan: perpanjangBulan,
       catatan: catatan,
       namaEvaluator: namaEvaluator,
+      signatureBase64: null, // Will be set separately if needed
     );
   }
   
@@ -699,6 +710,28 @@ class EvaluasiPdfGenerator {
     pw.TextStyle smallStyle,
     DateFormat dateFormat,
   ) {
+    // Convert base64 signatures to images if available
+    pw.MemoryImage? signatureImage;
+    pw.MemoryImage? hcgsSignatureImage;
+    
+    if (data.signatureBase64 != null && data.signatureBase64!.isNotEmpty) {
+      try {
+        final bytes = base64Decode(data.signatureBase64!);
+        signatureImage = pw.MemoryImage(bytes);
+      } catch (e) {
+        // If decode fails, signatureImage stays null
+      }
+    }
+    
+    if (data.hcgsSignatureBase64 != null && data.hcgsSignatureBase64!.isNotEmpty) {
+      try {
+        final bytes = base64Decode(data.hcgsSignatureBase64!);
+        hcgsSignatureImage = pw.MemoryImage(bytes);
+      } catch (e) {
+        // If decode fails, hcgsSignatureImage stays null
+      }
+    }
+    
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey400),
       columnWidths: {
@@ -730,10 +763,28 @@ class EvaluasiPdfGenerator {
         ),
         pw.TableRow(
           children: [
-            pw.Container(height: 50),
-            pw.Container(height: 50),
-            pw.Container(height: 50),
-            pw.Container(height: 50),
+            // Employee signature column - show signature if available
+            pw.Container(
+              height: 50,
+              child: signatureImage != null
+                  ? pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                    )
+                  : pw.Container(),
+            ),
+            pw.Container(height: 50), // Atasan Langsung
+            // HCGS signature column - show signature if available
+            pw.Container(
+              height: 50,
+              child: hcgsSignatureImage != null
+                  ? pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Image(hcgsSignatureImage, fit: pw.BoxFit.contain),
+                    )
+                  : pw.Container(),
+            ),
+            pw.Container(height: 50), // Fungsional
           ],
         ),
         pw.TableRow(
@@ -762,7 +813,10 @@ class EvaluasiPdfGenerator {
               padding: const pw.EdgeInsets.all(6),
               child: pw.Column(
                 children: [
-                  pw.Text('(                    )', style: smallStyle),
+                  pw.Text(
+                    '(${data.hcgsAdminName.isNotEmpty ? data.hcgsAdminName : "                    "})', 
+                    style: smallStyle
+                  ),
                   pw.Text('HCGS', style: smallStyle),
                   pw.Text('Tanggal:', style: smallStyle),
                 ],

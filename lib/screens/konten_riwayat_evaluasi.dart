@@ -210,6 +210,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                       children: [
                         _buildTableHeader("KARYAWAN", flex: 2),
                         _buildTableHeader("TANGGAL", flex: 1),
+                        _buildTableHeader("PKWT KE", center: true),
                         _buildTableHeader("STATUS", flex: 1, center: true),
                         _buildTableHeader("AKSI", flex: 1, center: true),
                       ],
@@ -535,6 +536,27 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
             child: Text(
               DateFormat('dd MMM yyyy').format(evaluasi.tanggalEvaluasi),
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
+          ),
+          
+          // PKWT Ke
+          Expanded(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "Ke-${evaluasi.pkwtKe}",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+              ),
             ),
           ),
 
@@ -879,6 +901,9 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
       izin: evaluasi.izin,
       terlambat: evaluasi.terlambat,
       mangkir: evaluasi.mangkir,
+      signatureBase64: evaluasi.signatureBase64,
+      hcgsAdminName: evaluasi.hcgsAdminName.isNotEmpty ? evaluasi.hcgsAdminName : 'Admin HCGS',
+      hcgsSignatureBase64: evaluasi.hcgsSignatureBase64,
     );
 
     ModernPdfPreviewDialog.show(

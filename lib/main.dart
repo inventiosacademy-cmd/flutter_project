@@ -5,6 +5,7 @@ import 'providers/prov_auth.dart';
 import 'providers/prov_karyawan.dart';
 import 'providers/prov_evaluasi.dart';
 import 'providers/prov_pkwt.dart';
+import 'providers/prov_evaluation_upload.dart';
 import 'screens/layar_login.dart';
 import 'screens/layar_utama.dart';
 import 'theme/tema.dart';
@@ -43,6 +44,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => EmployeeProvider()),
         ChangeNotifierProvider(create: (_) => EvaluasiProvider()),
         ChangeNotifierProvider(create: (_) => PkwtProvider()),
+        ChangeNotifierProvider(create: (_) => EvaluationUploadProvider()),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {

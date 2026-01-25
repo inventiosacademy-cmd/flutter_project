@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:typed_data';
+import 'dart:convert';
 import '../models/karyawan.dart';
 import '../models/evaluasi.dart';
 import '../providers/prov_karyawan.dart';
@@ -10,6 +12,9 @@ import '../theme/warna.dart';
 import '../services/pdf_generator.dart';
 import 'package:printing/printing.dart';
 import '../widgets/pdf_preview_dialog.dart';
+import 'package:signature/signature.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
 class KontenEvaluasi extends StatefulWidget {
   final Employee employee;
@@ -52,6 +57,17 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
   final _notesController = TextEditingController();
   final _periodeController = TextEditingController();
   
+  // Absence controllers
+  final _sakitController = TextEditingController();
+  final _izinController = TextEditingController();
+  final _terlambatController = TextEditingController();
+  final _mangkirController = TextEditingController();
+  
+  // Signature
+  late SignatureController _signatureController;
+  Uint8List? _signatureBytes;
+  String _signatureMode = 'draw'; // 'draw' or 'upload'
+  
   @override
   void initState() {
     super.initState();
@@ -65,12 +81,30 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
     final now = DateTime.now();
     final quarter = ((now.month - 1) ~/ 3) + 1;
     _periodeController.text = 'Q$quarter ${now.year}';
+    
+    // Initialize absence controllers with default value "0"
+    _sakitController.text = '0';
+    _izinController.text = '0';
+    _terlambatController.text = '0';
+    _mangkirController.text = '0';
+    
+    // Initialize signature controller
+    _signatureController = SignatureController(
+      penStrokeWidth: 3,
+      penColor: Colors.black,
+      exportBackgroundColor: Colors.white,
+    );
   }
   
   @override
   void dispose() {
     _notesController.dispose();
     _periodeController.dispose();
+    _sakitController.dispose();
+    _izinController.dispose();
+    _terlambatController.dispose();
+    _mangkirController.dispose();
+    _signatureController.dispose();
     for (var c in _comments.values) {
       c.dispose();
     }
@@ -187,6 +221,12 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       comments: commentsMap,
       recommendation: _recommendation,
       perpanjangBulan: _perpanjangBulan,
+      sakit: int.tryParse(_sakitController.text) ?? 0,
+      izin: int.tryParse(_izinController.text) ?? 0,
+      terlambat: int.tryParse(_terlambatController.text) ?? 0,
+      mangkir: int.tryParse(_mangkirController.text) ?? 0,
+      signatureBase64: _signatureBytes != null ? base64Encode(_signatureBytes!) : null,
+      hcgsAdminName: 'Admin HCGS', // TODO: Get from settings or user input
     );
 
     try {
@@ -282,11 +322,40 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       perpanjangBulan: _perpanjangBulan,
       catatan: _notesController.text,
       namaEvaluator: 'HR Manager', // TODO: Get from auth
+      sakit: int.tryParse(_sakitController.text) ?? 0,
+      izin: int.tryParse(_izinController.text) ?? 0,
+      terlambat: int.tryParse(_terlambatController.text) ?? 0,
+      mangkir: int.tryParse(_mangkirController.text) ?? 0,
+    );
+    
+    // Create a new EvaluasiData with signature
+    final evaluasiDataWithSignature = EvaluasiData(
+      namaKaryawan: evaluasiData.namaKaryawan,
+      posisi: evaluasiData.posisi,
+      departemen: evaluasiData.departemen,
+      lokasiKerja: evaluasiData.lokasiKerja,
+      atasanLangsung: evaluasiData.atasanLangsung,
+      tanggalMasuk: evaluasiData.tanggalMasuk,
+      tanggalPkwtBerakhir: evaluasiData.tanggalPkwtBerakhir,
+      pkwtKe: evaluasiData.pkwtKe,
+      tanggalEvaluasi: evaluasiData.tanggalEvaluasi,
+      sakit: evaluasiData.sakit,
+      izin: evaluasiData.izin,
+      terlambat: evaluasiData.terlambat,
+      mangkir: evaluasiData.mangkir,
+      ratings: evaluasiData.ratings,
+      comments: evaluasiData.comments,
+      recommendation: evaluasiData.recommendation,
+      perpanjangBulan: evaluasiData.perpanjangBulan,
+      catatan: evaluasiData.catatan,
+      namaEvaluator: evaluasiData.namaEvaluator,
+      signatureBase64: _signatureBytes != null ? base64Encode(_signatureBytes!) : null,
+      hcgsAdminName: 'Admin HCGS', // TODO: Get from settings or user input
     );
 
     ModernPdfPreviewDialog.show(
       context: context,
-      evaluasiData: evaluasiData,
+      evaluasiData: evaluasiDataWithSignature,
       fileName: 'evaluasi_${widget.employee.nama.replaceAll(' ', '_')}.pdf',
     );
   }
@@ -358,6 +427,14 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
             
             // Summary and Recommendation
             _buildSummaryCard(),
+            const SizedBox(height: 24),
+            
+            // Absence Data
+            _buildAbsenceCard(),
+            const SizedBox(height: 24),
+            
+            // Signature
+            _buildSignatureCard(),
             const SizedBox(height: 24),
             
             // Notes
@@ -827,6 +904,412 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
           Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
           const SizedBox(height: 4),
           Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildAbsenceCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('KETIDAKHADIRAN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          const SizedBox(height: 4),
+          Text('Data ketidakhadiran selama masa penilaian PKWT', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAbsenceField(
+                  'Sakit',
+                  _sakitController,
+                  Icons.medical_services_rounded,
+                  const Color(0xFFEF4444),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildAbsenceField(
+                  'Izin',
+                  _izinController,
+                  Icons.event_available_rounded,
+                  const Color(0xFF3B82F6),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAbsenceField(
+                  'Terlambat',
+                  _terlambatController,
+                  Icons.schedule_rounded,
+                  const Color(0xFFF59E0B),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildAbsenceField(
+                  'Mangkir',
+                  _mangkirController,
+                  Icons.person_off_rounded,
+                  const Color(0xFF8B5CF6),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildAbsenceField(String label, TextEditingController controller, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 8),
+              Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+              hintText: '0',
+              suffixText: 'hari',
+              suffixStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              filled: true,
+              fillColor: Colors.white,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: color, width: 2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSignatureCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('TANDA TANGAN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              const SizedBox(width: 12),
+              // Toggle between draw and upload
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _signatureMode = 'draw';
+                          _signatureBytes = null;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _signatureMode == 'draw' ? AppColors.primaryBlue : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.draw_rounded, 
+                              size: 16, 
+                              color: _signatureMode == 'draw' ? Colors.white : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Gambar',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _signatureMode == 'draw' ? Colors.white : Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _signatureMode = 'upload';
+                          _signatureController.clear();
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _signatureMode == 'upload' ? AppColors.primaryBlue : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.upload_file_rounded, 
+                              size: 16, 
+                              color: _signatureMode == 'upload' ? Colors.white : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Upload',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _signatureMode == 'upload' ? Colors.white : Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _signatureMode == 'draw' 
+                ? 'Gambar tanda tangan Anda di area di bawah ini'
+                : 'Upload gambar tanda tangan (PNG, JPG)',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 16),
+          
+          if (_signatureMode == 'draw') ...[
+            // Signature Pad
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300, width: 2),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey.shade50,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Signature(
+                  controller: _signatureController,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      _signatureController.clear();
+                      setState(() => _signatureBytes = null);
+                    },
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    label: const Text('Hapus'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (_signatureController.isNotEmpty) {
+                        final signature = await _signatureController.toPngBytes();
+                        setState(() => _signatureBytes = signature);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Row(
+                                children: [
+                                  Icon(Icons.check_circle_rounded, color: Colors.white),
+                                  SizedBox(width: 12),
+                                  Text('Tanda tangan disimpan'),
+                                ],
+                              ),
+                              backgroundColor: AppColors.success,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Simpan Tanda Tangan'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            // Upload button
+            InkWell(
+              onTap: () async {
+                try {
+                  FilePickerResult? result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['jpg', 'jpeg', 'png'],
+                    withData: true,
+                  );
+                  
+                  if (result != null && result.files.isNotEmpty) {
+                    final file = result.files.first;
+                    
+                    // Get bytes from picked file
+                    Uint8List? bytes;
+                    if (file.bytes != null) {
+                      bytes = file.bytes;
+                    } else if (file.path != null) {
+                      bytes = await File(file.path!).readAsBytes();
+                    }
+                    
+                    if (bytes != null) {
+                      setState(() => _signatureBytes = bytes);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Row(
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: Colors.white),
+                                SizedBox(width: 12),
+                                Text('Gambar tanda tangan berhasil diupload'),
+                              ],
+                            ),
+                            backgroundColor: AppColors.success,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        );
+                      }
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.error_rounded, color: Colors.white),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text('Gagal memilih gambar: $e')),
+                          ],
+                        ),
+                        backgroundColor: Colors.red,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300, width: 2, style: BorderStyle.solid),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey.shade50,
+                ),
+                child: _signatureBytes == null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.cloud_upload_rounded, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Klik untuk upload gambar',
+                              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.memory(
+                          _signatureBytes!,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+              ),
+            ),
+            if (_signatureBytes != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _signatureBytes = null);
+                  },
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Hapus Gambar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );

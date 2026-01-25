@@ -255,6 +255,7 @@ class _DashboardContentState extends State<DashboardContent> {
                         _buildTableHeader("KARYAWAN", flex: 2),
                         _buildTableHeader("ID KARYAWAN", flex: 1),
                         _buildTableHeader("DEPARTEMEN", flex: 1),
+                        _buildTableHeader("PKWT KE", center: true),
                         _buildTableHeader("MASA KERJA", flex: 1),
                         _buildTableHeader("SISA KONTRAK", flex: 1),
                         _buildTableHeader("STATUS", center: true),
@@ -287,10 +288,15 @@ class _DashboardContentState extends State<DashboardContent> {
                         }).toList();
                       }
 
+
                       // Filter by evaluation
                       if (_selectedEvaluasi != 'Semua') {
                         employees = employees.where((e) {
-                          final hasEvaluation = evaluasiProvider.getEvaluasiByEmployee(e.id).isNotEmpty;
+                          // Check evaluation for CURRENT PKWT Ke only
+                          final hasEvaluation = evaluasiProvider
+                              .getEvaluasiByEmployee(e.id)
+                              .where((eval) => eval.pkwtKe == e.pkwtKe)
+                              .isNotEmpty;
                           final daysLeft = e.hariMenujuExpired;
                           
                           if (_selectedEvaluasi == 'Sudah Evaluasi') {
@@ -383,7 +389,11 @@ class _DashboardContentState extends State<DashboardContent> {
 
                       if (_selectedEvaluasi != 'Semua') {
                         filteredEmployees = filteredEmployees.where((e) {
-                          final hasEvaluation = evaluasiProvider.getEvaluasiByEmployee(e.id).isNotEmpty;
+                          // Check evaluation for CURRENT PKWT Ke only
+                          final hasEvaluation = evaluasiProvider
+                              .getEvaluasiByEmployee(e.id)
+                              .where((eval) => eval.pkwtKe == e.pkwtKe)
+                              .isNotEmpty;
                           final daysLeft = e.hariMenujuExpired;
                           
                           if (_selectedEvaluasi == 'Sudah Evaluasi') {
@@ -736,6 +746,26 @@ class _DashboardContentState extends State<DashboardContent> {
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
             ),
           ),
+          // PKWT Ke
+          Expanded(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "Ke-${emp.pkwtKe}",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+              ),
+            ),
+          ),
           // Masa Kerja
           Expanded(
             flex: 1,
@@ -786,7 +816,11 @@ class _DashboardContentState extends State<DashboardContent> {
           Expanded(
             child: Consumer<EvaluasiProvider>(
               builder: (context, evaluasiProvider, _) {
-                final hasEvaluation = evaluasiProvider.getEvaluasiByEmployee(emp.id).isNotEmpty;
+                // Check if employee has evaluation for CURRENT PKWT Ke
+                final hasEvaluation = evaluasiProvider
+                    .getEvaluasiByEmployee(emp.id)
+                    .where((e) => e.pkwtKe == emp.pkwtKe)
+                    .isNotEmpty;
                 
                 String evalText;
                 Color evalColor;
