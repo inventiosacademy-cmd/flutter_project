@@ -225,7 +225,8 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       izin: int.tryParse(_izinController.text) ?? 0,
       terlambat: int.tryParse(_terlambatController.text) ?? 0,
       mangkir: int.tryParse(_mangkirController.text) ?? 0,
-      signatureBase64: _signatureBytes != null ? base64Encode(_signatureBytes!) : null,
+      signatureBase64: null,
+      hcgsSignatureBase64: _signatureBytes != null ? base64Encode(_signatureBytes!) : null,
       hcgsAdminName: 'Admin HCGS', // TODO: Get from settings or user input
     );
 
@@ -349,7 +350,8 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       perpanjangBulan: evaluasiData.perpanjangBulan,
       catatan: evaluasiData.catatan,
       namaEvaluator: evaluasiData.namaEvaluator,
-      signatureBase64: _signatureBytes != null ? base64Encode(_signatureBytes!) : null,
+      signatureBase64: null,
+      hcgsSignatureBase64: _signatureBytes != null ? base64Encode(_signatureBytes!) : null,
       hcgsAdminName: 'Admin HCGS', // TODO: Get from settings or user input
     );
 

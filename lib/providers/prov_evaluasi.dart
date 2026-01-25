@@ -75,6 +75,9 @@ class EvaluasiProvider with ChangeNotifier {
       izin: data['izin'] ?? 0,
       terlambat: data['terlambat'] ?? 0,
       mangkir: data['mangkir'] ?? 0,
+      signatureBase64: data['signatureBase64'],
+      hcgsAdminName: data['hcgsAdminName'] ?? '',
+      hcgsSignatureBase64: data['hcgsSignatureBase64'],
     );
   }
 
@@ -105,6 +108,9 @@ class EvaluasiProvider with ChangeNotifier {
       'izin': evaluasi.izin,
       'terlambat': evaluasi.terlambat,
       'mangkir': evaluasi.mangkir,
+      'signatureBase64': evaluasi.signatureBase64,
+      'hcgsAdminName': evaluasi.hcgsAdminName,
+      'hcgsSignatureBase64': evaluasi.hcgsSignatureBase64,
     };
   }
 
