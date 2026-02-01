@@ -51,6 +51,5 @@ if(MSVC)
   target_link_options(${BINARY_NAME} PRIVATE 
     "/DYNAMICBASE" # Address Space Layout Randomization (ASLR)
     "/NXCOMPAT"    # Data Execution Prevention (DEP)
-    "/CETCOMPAT"   # Shadow Stack (if supported)
   )
 endif()

@@ -41,10 +41,19 @@ class EvaluasiData {
   // Evaluator info
   final String namaEvaluator;
   
-  // Signatures (base64 encoded images)
-  final String? signatureBase64; // Employee signature
-  final String hcgsAdminName; // HCGS admin name
-  final String? hcgsSignatureBase64; // HCGS signature
+  // Role-based Signatures (base64 encoded images)
+  final String? atasanSignatureBase64;
+  final String? atasanSignatureNama;
+  final String? karyawanSignatureBase64;
+  final String? karyawanSignatureNama;
+  final String? hcgsSignatureBase64;
+  final String? hcgsSignatureNama;
+  final String? fungsionalSignatureBase64;
+  final String? fungsionalSignatureNama;
+  
+  // Legacy fields
+  final String? signatureBase64;
+  final String hcgsAdminName;
   
   EvaluasiData({
     required this.namaKaryawan,
@@ -66,9 +75,18 @@ class EvaluasiData {
     this.perpanjangBulan = 6,
     this.catatan = '',
     required this.namaEvaluator,
+    // Role-based signatures
+    this.atasanSignatureBase64,
+    this.atasanSignatureNama,
+    this.karyawanSignatureBase64,
+    this.karyawanSignatureNama,
+    this.hcgsSignatureBase64,
+    this.hcgsSignatureNama,
+    this.fungsionalSignatureBase64,
+    this.fungsionalSignatureNama,
+    // Legacy
     this.signatureBase64,
     this.hcgsAdminName = '',
-    this.hcgsSignatureBase64,
   });
   
   factory EvaluasiData.fromEmployee(Employee employee, {
@@ -711,26 +729,64 @@ class EvaluasiPdfGenerator {
     DateFormat dateFormat,
   ) {
     // Convert base64 signatures to images if available
-    pw.MemoryImage? signatureImage;
+    pw.MemoryImage? karyawanSignatureImage;
+    pw.MemoryImage? atasanSignatureImage;
     pw.MemoryImage? hcgsSignatureImage;
+    pw.MemoryImage? fungsionalSignatureImage;
     
-    if (data.signatureBase64 != null && data.signatureBase64!.isNotEmpty) {
+    // Decode Karyawan signature
+    print('PDF: Karyawan signature base64 length: ${data.karyawanSignatureBase64?.length}');
+    if (data.karyawanSignatureBase64 != null && data.karyawanSignatureBase64!.isNotEmpty) {
       try {
-        final bytes = base64Decode(data.signatureBase64!);
-        signatureImage = pw.MemoryImage(bytes);
+        final bytes = base64Decode(data.karyawanSignatureBase64!);
+        karyawanSignatureImage = pw.MemoryImage(bytes);
+        print('PDF: Karyawan signature decoded successfully, bytes: ${bytes.length}');
       } catch (e) {
-        // If decode fails, signatureImage stays null
+        print('PDF: Error decoding Karyawan signature: $e');
       }
     }
     
+    // Decode Atasan signature
+    print('PDF: Atasan signature base64 length: ${data.atasanSignatureBase64?.length}');
+    if (data.atasanSignatureBase64 != null && data.atasanSignatureBase64!.isNotEmpty) {
+      try {
+        final bytes = base64Decode(data.atasanSignatureBase64!);
+        atasanSignatureImage = pw.MemoryImage(bytes);
+        print('PDF: Atasan signature decoded successfully, bytes: ${bytes.length}');
+      } catch (e) {
+        print('PDF: Error decoding Atasan signature: $e');
+      }
+    }
+    
+    // Decode HCGS signature
+    print('PDF: HCGS signature base64 length: ${data.hcgsSignatureBase64?.length}');
     if (data.hcgsSignatureBase64 != null && data.hcgsSignatureBase64!.isNotEmpty) {
       try {
         final bytes = base64Decode(data.hcgsSignatureBase64!);
         hcgsSignatureImage = pw.MemoryImage(bytes);
+        print('PDF: HCGS signature decoded successfully, bytes: ${bytes.length}');
       } catch (e) {
-        // If decode fails, hcgsSignatureImage stays null
+        print('PDF: Error decoding HCGS signature: $e');
       }
     }
+    
+    // Decode Fungsional signature
+    print('PDF: Fungsional signature base64 length: ${data.fungsionalSignatureBase64?.length}');
+    if (data.fungsionalSignatureBase64 != null && data.fungsionalSignatureBase64!.isNotEmpty) {
+      try {
+        final bytes = base64Decode(data.fungsionalSignatureBase64!);
+        fungsionalSignatureImage = pw.MemoryImage(bytes);
+        print('PDF: Fungsional signature decoded successfully, bytes: ${bytes.length}');
+      } catch (e) {
+        print('PDF: Error decoding Fungsional signature: $e');
+      }
+    }
+    
+    print('PDF: Rendering signatures...');
+    print('  karyawanSignatureImage: ${karyawanSignatureImage != null}');
+    print('  atasanSignatureImage: ${atasanSignatureImage != null}');
+    print('  hcgsSignatureImage: ${hcgsSignatureImage != null}');
+    print('  fungsionalSignatureImage: ${fungsionalSignatureImage != null}');
     
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey400),
@@ -763,18 +819,27 @@ class EvaluasiPdfGenerator {
         ),
         pw.TableRow(
           children: [
-            // Employee signature column - show signature if available
+            // Karyawan signature
             pw.Container(
               height: 50,
-              child: signatureImage != null
+              child: karyawanSignatureImage != null
                   ? pw.Padding(
                       padding: const pw.EdgeInsets.all(4),
-                      child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                      child: pw.Image(karyawanSignatureImage, fit: pw.BoxFit.contain),
                     )
                   : pw.Container(),
             ),
-            pw.Container(height: 50), // Atasan Langsung
-            // HCGS signature column - show signature if available
+            // Atasan signature
+            pw.Container(
+              height: 50,
+              child: atasanSignatureImage != null
+                  ? pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Image(atasanSignatureImage, fit: pw.BoxFit.contain),
+                    )
+                  : pw.Container(),
+            ),
+            // HCGS signature
             pw.Container(
               height: 50,
               child: hcgsSignatureImage != null
@@ -784,7 +849,16 @@ class EvaluasiPdfGenerator {
                     )
                   : pw.Container(),
             ),
-            pw.Container(height: 50), // Fungsional
+            // Fungsional signature
+            pw.Container(
+              height: 50,
+              child: fungsionalSignatureImage != null
+                  ? pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Image(fungsionalSignatureImage, fit: pw.BoxFit.contain),
+                    )
+                  : pw.Container(),
+            ),
           ],
         ),
         pw.TableRow(
@@ -793,7 +867,10 @@ class EvaluasiPdfGenerator {
               padding: const pw.EdgeInsets.all(6),
               child: pw.Column(
                 children: [
-                  pw.Text('(${data.namaKaryawan})', style: smallStyle),
+                  pw.Text(
+                    '(${data.karyawanSignatureNama ?? data.namaKaryawan})', 
+                    style: smallStyle
+                  ),
                   pw.Text('Karyawan', style: smallStyle),
                   pw.Text('Tanggal:', style: smallStyle),
                 ],
@@ -803,7 +880,10 @@ class EvaluasiPdfGenerator {
               padding: const pw.EdgeInsets.all(6),
               child: pw.Column(
                 children: [
-                  pw.Text('(${data.atasanLangsung})', style: smallStyle),
+                  pw.Text(
+                    '(${data.atasanSignatureNama ?? data.atasanLangsung})', 
+                    style: smallStyle
+                  ),
                   pw.Text('Atasan Langsung', style: smallStyle),
                   pw.Text('Tanggal:', style: smallStyle),
                 ],
@@ -814,7 +894,7 @@ class EvaluasiPdfGenerator {
               child: pw.Column(
                 children: [
                   pw.Text(
-                    '(${data.hcgsAdminName.isNotEmpty ? data.hcgsAdminName : "                    "})', 
+                    '(${data.hcgsSignatureNama ?? (data.hcgsAdminName.isNotEmpty ? data.hcgsAdminName : "                    ")})', 
                     style: smallStyle
                   ),
                   pw.Text('HCGS', style: smallStyle),
@@ -826,7 +906,10 @@ class EvaluasiPdfGenerator {
               padding: const pw.EdgeInsets.all(6),
               child: pw.Column(
                 children: [
-                  pw.Text('(                    )', style: smallStyle),
+                  pw.Text(
+                    '(${data.fungsionalSignatureNama ?? "                    "})', 
+                    style: smallStyle
+                  ),
                   pw.Text('Fungsional', style: smallStyle),
                   pw.Text('Tanggal:', style: smallStyle),
                 ],

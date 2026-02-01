@@ -50,10 +50,19 @@ class Evaluasi {
   final int terlambat;
   final int mangkir;
   
-  // Signatures
-  final String? signatureBase64; // Employee signature
-  final String hcgsAdminName; // HCGS admin name
-  final String? hcgsSignatureBase64; // HCGS signature
+  // Signatures - Role-based
+  final String? atasanSignatureBase64;
+  final String? atasanSignatureNama;
+  final String? karyawanSignatureBase64;
+  final String? karyawanSignatureNama;
+  final String? hcgsSignatureBase64;
+  final String? hcgsSignatureNama;
+  final String? fungsionalSignatureBase64;
+  final String? fungsionalSignatureNama;
+  
+  // Legacy fields (kept for backward compatibility)
+  final String? signatureBase64;
+  final String hcgsAdminName;
 
   Evaluasi({
     required this.id,
@@ -81,9 +90,18 @@ class Evaluasi {
     this.izin = 0,
     this.terlambat = 0,
     this.mangkir = 0,
+    // Role-based signatures
+    this.atasanSignatureBase64,
+    this.atasanSignatureNama,
+    this.karyawanSignatureBase64,
+    this.karyawanSignatureNama,
+    this.hcgsSignatureBase64,
+    this.hcgsSignatureNama,
+    this.fungsionalSignatureBase64,
+    this.fungsionalSignatureNama,
+    // Legacy
     this.signatureBase64,
     this.hcgsAdminName = '',
-    this.hcgsSignatureBase64,
   }) : 
     ratings = ratings ?? {},
     comments = comments ?? {},
@@ -116,9 +134,16 @@ class Evaluasi {
     int? izin,
     int? terlambat,
     int? mangkir,
+    String? atasanSignatureBase64,
+    String? atasanSignatureNama,
+    String? karyawanSignatureBase64,
+    String? karyawanSignatureNama,
+    String? hcgsSignatureBase64,
+    String? hcgsSignatureNama,
+    String? fungsionalSignatureBase64,
+    String? fungsionalSignatureNama,
     String? signatureBase64,
     String? hcgsAdminName,
-    String? hcgsSignatureBase64,
   }) {
     return Evaluasi(
       id: id ?? this.id,
@@ -146,9 +171,16 @@ class Evaluasi {
       izin: izin ?? this.izin,
       terlambat: terlambat ?? this.terlambat,
       mangkir: mangkir ?? this.mangkir,
+      atasanSignatureBase64: atasanSignatureBase64 ?? this.atasanSignatureBase64,
+      atasanSignatureNama: atasanSignatureNama ?? this.atasanSignatureNama,
+      karyawanSignatureBase64: karyawanSignatureBase64 ?? this.karyawanSignatureBase64,
+      karyawanSignatureNama: karyawanSignatureNama ?? this.karyawanSignatureNama,
+      hcgsSignatureBase64: hcgsSignatureBase64 ?? this.hcgsSignatureBase64,
+      hcgsSignatureNama: hcgsSignatureNama ?? this.hcgsSignatureNama,
+      fungsionalSignatureBase64: fungsionalSignatureBase64 ?? this.fungsionalSignatureBase64,
+      fungsionalSignatureNama: fungsionalSignatureNama ?? this.fungsionalSignatureNama,
       signatureBase64: signatureBase64 ?? this.signatureBase64,
       hcgsAdminName: hcgsAdminName ?? this.hcgsAdminName,
-      hcgsSignatureBase64: hcgsSignatureBase64 ?? this.hcgsSignatureBase64,
     );
   }
   

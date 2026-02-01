@@ -6,6 +6,7 @@ import '../providers/prov_evaluasi.dart';
 import '../models/karyawan.dart';
 import '../theme/warna.dart';
 import '../widgets/import_dialog.dart';
+import '../widgets/pkwt_upload_dialog.dart';
 
 class DashboardContent extends StatefulWidget {
   final VoidCallback? onTambahKaryawan;
@@ -255,7 +256,6 @@ class _DashboardContentState extends State<DashboardContent> {
                         _buildTableHeader("KARYAWAN", flex: 2),
                         _buildTableHeader("ID KARYAWAN", flex: 1),
                         _buildTableHeader("DEPARTEMEN", flex: 1),
-                        _buildTableHeader("PKWT KE", center: true),
                         _buildTableHeader("MASA KERJA", flex: 1),
                         _buildTableHeader("SISA KONTRAK", flex: 1),
                         _buildTableHeader("STATUS", center: true),
@@ -746,26 +746,6 @@ class _DashboardContentState extends State<DashboardContent> {
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
             ),
           ),
-          // PKWT Ke
-          Expanded(
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  "Ke-${emp.pkwtKe}",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryBlue,
-                  ),
-                ),
-              ),
-            ),
-          ),
           // Masa Kerja
           Expanded(
             flex: 1,
@@ -896,6 +876,8 @@ class _DashboardContentState extends State<DashboardContent> {
                         widget.onEvaluasi?.call(emp);
                       } else if (value == 'edit') {
                         widget.onEdit?.call(emp);
+                      } else if (value == 'upload_pkwt') {
+                        PkwtUploadDialog.show(context, emp.id);
                       } else if (value == 'delete') {
                         showDialog(
                           context: context,
@@ -968,6 +950,16 @@ class _DashboardContentState extends State<DashboardContent> {
                             Icon(Icons.assignment_turned_in_outlined, size: 18, color: Colors.grey.shade700),
                             const SizedBox(width: 12),
                             Text('Evaluasi', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'upload_pkwt',
+                        child: Row(
+                          children: [
+                            Icon(Icons.upload_file_outlined, size: 18, color: Colors.grey.shade700),
+                            const SizedBox(width: 12),
+                            Text('Upload PKWT', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),

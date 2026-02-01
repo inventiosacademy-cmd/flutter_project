@@ -7,6 +7,7 @@ import '../theme/warna.dart';
 import '../services/pdf_generator.dart';
 import 'package:printing/printing.dart';
 import '../widgets/pdf_preview_dialog.dart';
+import 'edit_evaluasi.dart';
 
 class KontenRiwayatEvaluasi extends StatefulWidget {
   final VoidCallback? onBuatEvaluasi;
@@ -590,25 +591,63 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
           Expanded(
             flex: 1,
             child: Center(
-              child: Tooltip(
-                message: 'Lihat PDF',
-                child: InkWell(
-                  onTap: () => _showPdfPreview(evaluasi),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Edit Button
+                  Tooltip(
+                    message: 'Edit Evaluasi',
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditEvaluasiScreen(
+                              evaluasi: evaluasi,
+                              onBack: () => Navigator.pop(context),
+                            ),
+                          ),
+                        );
+                      },
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
-                    ),
-                    child: const Icon(
-                      Icons.picture_as_pdf,
-                      size: 20,
-                      color: Color(0xFFEF4444),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.2)),
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          size: 20,
+                          color: Color(0xFF22C55E),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // View PDF Button
+                  Tooltip(
+                    message: 'Lihat PDF',
+                    child: InkWell(
+                      onTap: () => _showPdfPreview(evaluasi),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
+                        ),
+                        child: const Icon(
+                          Icons.picture_as_pdf,
+                          size: 20,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

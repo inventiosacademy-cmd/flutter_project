@@ -13,14 +13,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     CreateAndAttachConsole();
   }
 
-  // ANTI-DEBUG: Force exit if debugger is detected in Release mode
-  #ifdef NDEBUG
-  if (::IsDebuggerPresent()) {
-      ::MessageBox(nullptr, L"Security Alert: Debugger detected! Application will close.", L"Security Error", MB_ICONERROR | MB_OK);
-      return EXIT_FAILURE;
-  }
-  #endif
-
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
