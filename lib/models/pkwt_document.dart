@@ -1,33 +1,17 @@
-class PkwtDocument {
-  final String id;
-  final String employeeId;
-  final String fileName;
-  final String fileUrl;
-  final DateTime uploadedAt;
-  final int fileSize;
-  final int pkwtKe;
+import 'uploaded_document.dart';
 
-  PkwtDocument({
-    required this.id,
-    required this.employeeId,
-    required this.fileName,
-    required this.fileUrl,
-    required this.uploadedAt,
-    required this.fileSize,
-    required this.pkwtKe,
+/// Model untuk dokumen PKWT
+/// Extends UploadedDocument untuk menghindari duplikasi kode
+class PkwtDocument extends UploadedDocument {
+  const PkwtDocument({
+    required super.id,
+    required super.employeeId,
+    required super.fileName,
+    required super.fileUrl,
+    required super.uploadedAt,
+    required super.fileSize,
+    required super.pkwtKe,
   });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'employeeId': employeeId,
-      'fileName': fileName,
-      'fileUrl': fileUrl,
-      'uploadedAt': uploadedAt.toIso8601String(),
-      'fileSize': fileSize,
-      'pkwtKe': pkwtKe,
-    };
-  }
 
   factory PkwtDocument.fromMap(Map<String, dynamic> map) {
     return PkwtDocument(
@@ -39,18 +23,5 @@ class PkwtDocument {
       fileSize: map['fileSize'] ?? 0,
       pkwtKe: map['pkwtKe'] ?? 1,
     );
-  }
-
-  // Helper method untuk format ukuran file
-  String get fileSizeFormatted {
-    if (fileSize < 1024) {
-      return '$fileSize B';
-    } else if (fileSize < 1024 * 1024) {
-      return '${(fileSize / 1024).toStringAsFixed(1)} KB';
-    } else if (fileSize < 1024 * 1024 * 1024) {
-      return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
-    } else {
-      return '${(fileSize / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-    }
   }
 }

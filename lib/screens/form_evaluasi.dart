@@ -57,6 +57,7 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
   int _perpanjangBulan = 6;
   final _notesController = TextEditingController();
   final _periodeController = TextEditingController();
+  final _perpanjangController = TextEditingController(text: '6');
   
   // Absence controllers
   final _sakitController = TextEditingController();
@@ -87,52 +88,58 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
     _terlambatController.text = '0';
     _mangkirController.text = '0';
     
-    // Initialize with one default signature for Atasan Langsung
-    _addSignature(defaultName: 'Atasan Langsung');
+    // Initialize 4 fixed signatures
+    _initFixedSignatures();
   }
   
-  void _addSignature({String? defaultName}) {
-    final newController = SignatureController(
+  void _initFixedSignatures() {
+    // 1. Karyawan (Yang Dinilai)
+    _addFixedSignature('Karyawan', 'Yang Dinilai', defaultStatus: 'Diketahui');
+    
+    // 2. Atasan (Atasan Langsung)
+    _addFixedSignature('Atasan', 'Atasan Langsung', defaultStatus: 'Disetujui');
+    
+    // 3. HCGS
+    _addFixedSignature('HCGS', 'HCGS', defaultStatus: 'Diketahui');
+    
+    // 4. Fungsional
+    _addFixedSignature('Fungsional', 'Fungsional', defaultStatus: 'Disetujui');
+  }
+  
+  void _addFixedSignature(String role, String defaultJabatan, {String defaultStatus = 'Diketahui'}) {
+    final controller = SignatureController(
       penStrokeWidth: 3,
       penColor: Colors.black,
       exportBackgroundColor: Colors.white,
     );
     
-    // Auto-save listener: save signature 500ms after user stops drawing
+    // Auto-save listener
     Timer? autoSaveTimer;
-    newController.addListener(() {
+    controller.addListener(() {
       autoSaveTimer?.cancel();
       autoSaveTimer = Timer(const Duration(milliseconds: 500), () async {
-        if (newController.isNotEmpty) {
-          final bytes = await newController.toPngBytes();
-          final index = _signatures.indexWhere((s) => s.signatureController == newController);
+        if (controller.isNotEmpty) {
+          final bytes = await controller.toPngBytes();
+          final index = _signatures.indexWhere((s) => s.signatureController == controller);
           if (index != -1 && mounted) {
             setState(() {
               _signatures[index].signatureBytes = bytes;
             });
-            print('✓ Auto-saved signature for ${_signatures[index].role}: ${_signatures[index].nameController.text}');
           }
         }
       });
     });
     
-    setState(() {
-      _signatures.add(_SignatureData(
-        nameController: TextEditingController(text: defaultName ?? 'Penanda Tangan ${_signatures.length + 1}'),
-        signatureController: newController,
-      ));
-    });
+    _signatures.add(_SignatureData(
+      nameController: TextEditingController(),
+      jabatanController: TextEditingController(text: defaultJabatan),
+      signatureController: controller,
+      role: role,
+      status: defaultStatus,
+    ));
   }
   
-  void _removeSignature(int index) {
-    if (_signatures.length > 1 && index > 0) {  // Keep at least one, can't remove first
-      setState(() {
-        _signatures[index].nameController.dispose();
-        _signatures[index].signatureController.dispose();
-        _signatures.removeAt(index);
-      });
-    }
-  }
+
   
   @override
   void dispose() {
@@ -145,6 +152,7 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
     // Dispose all signatures
     for (var sig in _signatures) {
       sig.nameController.dispose();
+      sig.jabatanController.dispose();
       sig.signatureController.dispose();
     }
     for (var c in _comments.values) {
@@ -190,6 +198,25 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
     return 'E';
   }
   
+  Future<void> _captureSignatures() async {
+    print('DEBUG: Starting _captureSignatures in FormEvaluasi');
+    for (int i = 0; i < _signatures.length; i++) {
+   	  final sig = _signatures[i];
+   	  if (sig.mode == 'draw' && sig.signatureController.isNotEmpty) {
+   	    try {
+   	      final bytes = await sig.signatureController.toPngBytes();
+   	      if (bytes != null) {
+   	        sig.signatureBytes = bytes;
+   	        print('DEBUG: Captured new bytes for ${sig.role}: ${bytes.length} bytes');
+   	      }
+   	    } catch (e) {
+   	      print('DEBUG: Error capturing signature for ${sig.role}: $e');
+   	    }
+   	  }
+   	}
+   	if (mounted) setState(() {});
+  }
+
   void _submit() async {
     // Check if all factors have ratings
     bool allRated = true;
@@ -220,6 +247,9 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
 
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Ensure signatures are captured
+    await _captureSignatures();
     
     // Build catatan from comments
     String fullCatatan = _notesController.text;
@@ -269,20 +299,33 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       mangkir: int.tryParse(_mangkirController.text) ?? 0,
       
       // Collect signatures by role
-      atasanSignatureBase64: _getSignatureByRole('Atasan'),
-      atasanSignatureNama: _getSignatureNameByRole('Atasan'),
-      karyawanSignatureBase64: _getSignatureByRole('Karyawan'),
-      karyawanSignatureNama: _getSignatureNameByRole('Karyawan'),
-      hcgsSignatureBase64: _getSignatureByRole('HCGS'),
-      hcgsSignatureNama: _getSignatureNameByRole('HCGS'),
-      fungsionalSignatureBase64: _getSignatureByRole('Fungsional'),
-      fungsionalSignatureNama: _getSignatureNameByRole('Fungsional'),
+      // Collect signatures by fixed index
+      // Index 0: Karyawan (Yang Dinilai)
+      karyawanSignatureBase64: _signatures[0].signatureBytes != null ? base64Encode(_signatures[0].signatureBytes!) : null,
+      karyawanSignatureNama: _signatures[0].nameController.text,
+      karyawanSignatureJabatan: _signatures[0].jabatanController.text,
+      
+      // Index 1: Atasan (Atasan Langsung)
+      atasanSignatureBase64: _signatures[1].signatureBytes != null ? base64Encode(_signatures[1].signatureBytes!) : null,
+      atasanSignatureNama: _signatures[1].nameController.text,
+      atasanSignatureJabatan: _signatures[1].jabatanController.text,
+      atasanSignatureStatus: _signatures[1].status,
+      
+      // Index 2: HCGS
+      hcgsSignatureBase64: _signatures[2].signatureBytes != null ? base64Encode(_signatures[2].signatureBytes!) : null,
+      hcgsSignatureNama: _signatures[2].nameController.text,
+      hcgsSignatureJabatan: _signatures[2].jabatanController.text,
+      hcgsSignatureStatus: _signatures[2].status,
+      
+      // Index 3: Fungsional
+      fungsionalSignatureBase64: _signatures[3].signatureBytes != null ? base64Encode(_signatures[3].signatureBytes!) : null,
+      fungsionalSignatureNama: _signatures[3].nameController.text,
+      fungsionalSignatureJabatan: _signatures[3].jabatanController.text,
+      fungsionalSignatureStatus: _signatures[3].status,
       
       // Legacy field - use first signature for backward compatibility
-      signatureBase64: _signatures.isNotEmpty && _signatures[0].signatureBytes != null 
-          ? base64Encode(_signatures[0].signatureBytes!) 
-          : null,
-      hcgsAdminName: _getSignatureNameByRole('HCGS') ?? 'Admin HCGS',
+      signatureBase64: _signatures[0].signatureBytes != null ? base64Encode(_signatures[0].signatureBytes!) : null,
+      hcgsAdminName: _signatures[2].nameController.text.isNotEmpty ? _signatures[2].nameController.text : 'Admin HCGS',
     );
 
     try {
@@ -330,65 +373,11 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
     }
   }
   
-  // Helper methods to get signature by role
-  String? _getSignatureByRole(String role) {
-    print('=== Getting signature for role: $role ===');
-    print('Total signatures: ${_signatures.length}');
-    for (var i = 0; i < _signatures.length; i++) {
-      var sig = _signatures[i];
-      print('Signature $i: role=${sig.role}, hasBytes=${sig.signatureBytes != null}, bytesLength=${sig.signatureBytes?.length}');
-      if (sig.role == role && sig.signatureBytes != null) {
-        print('✓ Found match for role $role at index $i');
-        return base64Encode(sig.signatureBytes!);
-      }
-    }
-    print('✗ No signature found for role $role');
-    return null;
-  }
-  
-  String? _getSignatureNameByRole(String role) {
-    for (var sig in _signatures) {
-      if (sig.role == role && sig.nameController.text.isNotEmpty) {
-        return sig.nameController.text;
-      }
-    }
-    return null;
-  }
-
-  void _exportPdf() async {
-    // Check if all factors have ratings
-    bool allRated = true;
-    for (var r in _ratings.values) {
-      if (r == null) {
-        allRated = false;
-        break;
-      }
-    }
-    
-    if (!allRated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning_rounded, color: Colors.white),
-              SizedBox(width: 12),
-              Text('Harap lengkapi semua penilaian sebelum export PDF'),
-            ],
-          ),
-          backgroundColor: AppColors.warning,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-      return;
-    }
-    
-    // Show preview dialog instead of direct print
-    _showPdfPreview();
-  }
-
-  void _showPdfPreview() {
+  void _showPdfPreview() async {
     print('>>> _showPdfPreview() CALLED <<<');
+    
+    // Ensure signatures are captured
+    await _captureSignatures();
     
     // Convert comments to Map<int, String>
     Map<int, String> commentsMap = {};
@@ -411,23 +400,7 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       mangkir: int.tryParse(_mangkirController.text) ?? 0,
     );
     
-    // Debug: Check what helper methods return
-    print('=== Creating PDF Data ===');
-    final atasanSig = _getSignatureByRole('Atasan');
-    final atasanName = _getSignatureNameByRole('Atasan');
-    final karyawanSig = _getSignatureByRole('Karyawan');
-    final karyawanName = _getSignatureNameByRole('Karyawan');
-    final hcgsSig = _getSignatureByRole('HCGS');
-    final hcgsName = _getSignatureNameByRole('HCGS');
-    final fungsionalSig = _getSignatureByRole('Fungsional');
-    final fungsionalName = _getSignatureNameByRole('Fungsional');
-    
-    print('Atasan: sig=${atasanSig?.substring(0, 20)}..., name=$atasanName');
-    print('Karyawan: sig=${karyawanSig?.substring(0, 20)}..., name=$karyawanName');
-    print('HCGS: sig=${hcgsSig?.substring(0, 20)}..., name=$hcgsName');
-    print('Fungsional: sig=${fungsionalSig?.substring(0, 20)}..., name=$fungsionalName');
-    
-    // Create a new EvaluasiData with signature
+    // Create a new EvaluasiData with signature - use index-based instead of role-based
     final evaluasiDataWithSignature = EvaluasiData(
       namaKaryawan: evaluasiData.namaKaryawan,
       posisi: evaluasiData.posisi,
@@ -448,23 +421,31 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       perpanjangBulan: evaluasiData.perpanjangBulan,
       catatan: evaluasiData.catatan,
       namaEvaluator: evaluasiData.namaEvaluator,
-<<<<<<< HEAD
       
-      // Role-based signatures for PDF
-      atasanSignatureBase64: atasanSig,
-      atasanSignatureNama: atasanName,
-      karyawanSignatureBase64: karyawanSig,
-      karyawanSignatureNama: karyawanName,
-      hcgsSignatureBase64: hcgsSig,
-      hcgsSignatureNama: hcgsName,
-      fungsionalSignatureBase64: fungsionalSig,
-      fungsionalSignatureNama: fungsionalName,
+      // Use index-based signatures for PDF (1st, 2nd, 3rd, 4th signature)
+      karyawanSignatureBase64: _signatures[0].signatureBytes != null ? base64Encode(_signatures[0].signatureBytes!) : null,
+      karyawanSignatureNama: _signatures[0].nameController.text,
+      karyawanSignatureJabatan: _signatures[0].jabatanController.text,
+      karyawanSignatureStatus: _signatures[0].status,
+      
+      atasanSignatureBase64: _signatures[1].signatureBytes != null ? base64Encode(_signatures[1].signatureBytes!) : null,
+      atasanSignatureNama: _signatures[1].nameController.text,
+      atasanSignatureJabatan: _signatures[1].jabatanController.text,
+      atasanSignatureStatus: _signatures[1].status,
+      
+      hcgsSignatureBase64: _signatures[2].signatureBytes != null ? base64Encode(_signatures[2].signatureBytes!) : null,
+      hcgsSignatureNama: _signatures[2].nameController.text,
+      hcgsSignatureJabatan: _signatures[2].jabatanController.text,
+      hcgsSignatureStatus: _signatures[2].status,
+      
+      fungsionalSignatureBase64: _signatures[3].signatureBytes != null ? base64Encode(_signatures[3].signatureBytes!) : null,
+      fungsionalSignatureNama: _signatures[3].nameController.text,
+      fungsionalSignatureJabatan: _signatures[3].jabatanController.text,
+      fungsionalSignatureStatus: _signatures[3].status,
       
       // Legacy fields
-      signatureBase64: _signatures.isNotEmpty && _signatures[0].signatureBytes != null 
-          ? base64Encode(_signatures[0].signatureBytes!) 
-          : null,
-      hcgsAdminName: hcgsName ?? 'Admin HCGS',
+      signatureBase64: _signatures[0].signatureBytes != null ? base64Encode(_signatures[0].signatureBytes!) : null,
+      hcgsAdminName: _signatures[2].nameController.text.isNotEmpty ? _signatures[2].nameController.text : 'Admin HCGS',
     );
 
     ModernPdfPreviewDialog.show(
@@ -791,7 +772,6 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
                     child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
                   ),
                 ),
-                const SizedBox(width: 120, child: Text('Komentar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center)),
               ],
             ),
           ),
@@ -816,7 +796,6 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
                     child: Text(count.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center),
                   );
                 }),
-                const SizedBox(width: 120),
               ],
             ),
           ),
@@ -838,7 +817,6 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
                   alignment: Alignment.center,
                   child: Text(_totalNilai.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primaryBlue)),
                 ),
-                const SizedBox(width: 120),
               ],
             ),
           ),
@@ -872,21 +850,6 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
               ),
             );
           }),
-          SizedBox(
-            width: 120,
-            child: TextField(
-              controller: _comments[index],
-              style: const TextStyle(fontSize: 11),
-              decoration: InputDecoration(
-                hintText: 'Komentar...',
-                hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade300)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade300)),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -959,12 +922,13 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
                           style: const TextStyle(fontSize: 13),
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
-                            hintText: '6',
+                            hintText: '',
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
                           ),
-                          onChanged: (v) => _perpanjangBulan = int.tryParse(v) ?? 6,
+                          controller: _perpanjangController,
+                          onChanged: (v) => _perpanjangBulan = int.tryParse(v) ?? 0,
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1040,45 +1004,13 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: _buildAbsenceField(
-                  'Sakit',
-                  _sakitController,
-                  Icons.medical_services_rounded,
-                  const Color(0xFFEF4444),
-                ),
-              ),
+              Expanded(child: _buildAbsenceField('Sakit', _sakitController)),
               const SizedBox(width: 16),
-              Expanded(
-                child: _buildAbsenceField(
-                  'Izin',
-                  _izinController,
-                  Icons.event_available_rounded,
-                  const Color(0xFF3B82F6),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildAbsenceField(
-                  'Terlambat',
-                  _terlambatController,
-                  Icons.schedule_rounded,
-                  const Color(0xFFF59E0B),
-                ),
-              ),
+              Expanded(child: _buildAbsenceField('Izin', _izinController)),
               const SizedBox(width: 16),
-              Expanded(
-                child: _buildAbsenceField(
-                  'Mangkir',
-                  _mangkirController,
-                  Icons.person_off_rounded,
-                  const Color(0xFF8B5CF6),
-                ),
-              ),
+              Expanded(child: _buildAbsenceField('Terlambat', _terlambatController)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildAbsenceField('Mangkir', _mangkirController)),
             ],
           ),
         ],
@@ -1086,54 +1018,38 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
     );
   }
   
-  Widget _buildAbsenceField(String label, TextEditingController controller, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(width: 8),
-              Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: '0',
-              suffixText: 'hari',
-              suffixStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-              filled: true,
-              fillColor: Colors.white,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: color, width: 2),
-              ),
+  Widget _buildAbsenceField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey.shade600)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(fontSize: 14),
+          textAlign: TextAlign.center,
+          decoration: InputDecoration(
+            hintText: '0',
+            suffixText: 'hari',
+            suffixStyle: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide(color: Colors.grey.shade400),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
   
@@ -1151,269 +1067,208 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
           const Text('TANDA TANGAN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
           const SizedBox(height: 16),
           
-          // Loop through all signatures
-          ...List.generate(_signatures.length, (index) {
-            final sig = _signatures[index];
-            return Column(
-              children: [
-                if (index > 0) const SizedBox(height: 20),
-                if (index > 0) Divider(color: Colors.grey.shade200, thickness: 1),
-                if (index > 0) const SizedBox(height: 20),
-                
-                _buildSingleSignature(sig, index),
-              ],
-            );
-          }),
-          
-          // Add button
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _addSignature(),
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: const Text('Tambah Tanda Tangan'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryBlue,
-                side: BorderSide(color: AppColors.primaryBlue),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
+          // Fixed 4 Signature Slots
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _signatures.length,
+            separatorBuilder: (context, index) => const Divider(height: 32, thickness: 1),
+            itemBuilder: (context, index) {
+              return _buildSingleSignature(index);
+            },
           ),
         ],
       ),
     );
   }
   
-  Widget _buildSingleSignature(_SignatureData sig, int index) {
+  Widget _buildSingleSignature(int index) {
+    if (index >= _signatures.length) return const SizedBox();
+    final sig = _signatures[index];
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name field and controls row
+        // Header with modes
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Tanda Tangan ${index + 1}', 
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B))
+            ),
+            Row(
+              children: [
+                // Draw Mode
+                InkWell(
+                  onTap: () => setState(() => sig.mode = 'draw'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: sig.mode == 'draw' ? AppColors.primaryBlue : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.draw_rounded, size: 16, color: sig.mode == 'draw' ? Colors.white : Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text('Gambar', style: TextStyle(fontSize: 12, color: sig.mode == 'draw' ? Colors.white : Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Upload Mode
+                InkWell(
+                  onTap: () => setState(() => sig.mode = 'upload'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: sig.mode == 'upload' ? AppColors.primaryBlue : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.upload_rounded, size: 16, color: sig.mode == 'upload' ? Colors.white : Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text('Upload', style: TextStyle(fontSize: 12, color: sig.mode == 'upload' ? Colors.white : Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        
+        // Name, Jabatan, Status fields
         Row(
           children: [
             Expanded(
               flex: 2,
-              child: TextField(
-                controller: sig.nameController,
-                decoration: InputDecoration(
-                  labelText: 'Nama Penanda Tangan',
-                  hintText: 'Contoh: Budi Santoso',
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Role dropdown
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: sig.role,
-                decoration: InputDecoration(
-                  labelText: 'Jabatan',
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Atasan', child: Text('Atasan')),
-                  DropdownMenuItem(value: 'Karyawan', child: Text('Karyawan')),
-                  DropdownMenuItem(value: 'HCGS', child: Text('HCGS')),
-                  DropdownMenuItem(value: 'Fungsional', child: Text('Fungsional')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => sig.role = value);
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Mode toggle
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  InkWell(
-                    onTap: () {
-                      setState(() {
-                        sig.mode = 'draw';
-                        sig.signatureBytes = null;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sig.mode == 'draw' ? AppColors.primaryBlue : Colors.transparent,
+                  Text('Nama Penanda Tangan', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: sig.nameController,
+                    decoration: InputDecoration(
+                      hintText: 'Nama Lengkap',
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.draw_rounded, 
-                            size: 16, 
-                            color: sig.mode == 'draw' ? Colors.white : Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Gambar',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: sig.mode == 'draw' ? Colors.white : Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      setState(() {
-                        sig.mode = 'upload';
-                        sig.signatureController.clear();
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sig.mode == 'upload' ? AppColors.primaryBlue : Colors.transparent,
+                      enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.upload_file_rounded, 
-                            size: 16, 
-                            color: sig.mode == 'upload' ? Colors.white : Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Upload',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: sig.mode == 'upload' ? Colors.white : Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
                   ),
                 ],
               ),
             ),
-            // Remove button (except first one)
-            if (index > 0) ...[
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () => _removeSignature(index),
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
-                tooltip: 'Hapus Tanda Tangan',
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.red.shade50,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Jabatan', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: sig.jabatanController,
+                    decoration: InputDecoration(
+                      hintText: 'Jabatan',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+            const SizedBox(width: 16),
+            // Status field
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Status', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: sig.status,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Diketahui', child: Text('Diketahui')),
+                      DropdownMenuItem(value: 'Disetujui', child: Text('Disetujui')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => sig.status = value);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         
         // Signature area
         if (sig.mode == 'draw') ...[
           Container(
-            height: 150,
+            height: 180,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300, width: 2),
+              border: Border.all(color: Colors.grey.shade300),
               borderRadius: BorderRadius.circular(8),
-              color: Colors.grey.shade50,
+              color: Colors.white,
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(7),
               child: Signature(
                 controller: sig.signatureController,
                 backgroundColor: Colors.white,
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    sig.signatureController.clear();
-                    setState(() => sig.signatureBytes = null);
-                  },
-                  icon: const Icon(Icons.clear_rounded, size: 16),
-                  label: const Text('Hapus'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
+          const SizedBox(height: 12),
+          // Clear button
+          Center(
+            child: OutlinedButton.icon(
+              onPressed: () {
+                sig.signatureController.clear();
+                setState(() => sig.signatureBytes = null);
+              },
+              icon: Icon(Icons.refresh_rounded, size: 16, color: Colors.grey.shade600),
+              label: Text('Bersihkan', style: TextStyle(color: Colors.grey.shade600)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey.shade300),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: sig.signatureBytes != null ? AppColors.success.withOpacity(0.1) : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: sig.signatureBytes != null ? AppColors.success : Colors.grey.shade300,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        sig.signatureBytes != null ? Icons.check_circle : Icons.pending,
-                        size: 16,
-                        color: sig.signatureBytes != null ? AppColors.success : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        sig.signatureBytes != null ? 'Tersimpan' : 'Menunggu...',
-                        style: TextStyle(
-                          color: sig.signatureBytes != null ? AppColors.success : Colors.grey.shade600,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ] else ...[
-          // Upload mode
+          // Upload mode contents (unchanged logic)
           InkWell(
             onTap: () async {
               try {
@@ -1434,49 +1289,18 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
                   
                   if (bytes != null) {
                     setState(() => sig.signatureBytes = bytes);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Row(
-                            children: [
-                              Icon(Icons.check_circle_rounded, color: Colors.white),
-                              SizedBox(width: 12),
-                              Text('Gambar berhasil diupload'),
-                            ],
-                          ),
-                          backgroundColor: AppColors.success,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      );
-                    }
                   }
                 }
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          const Icon(Icons.error_rounded, color: Colors.white),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text('Gagal upload: $e')),
-                        ],
-                      ),
-                      backgroundColor: Colors.red,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  );
-                }
+                // error handling
               }
             },
             child: Container(
-              height: 150,
+              height: 180,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300, width: 2),
+                border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(8),
-                color: Colors.grey.shade50,
+                color: Colors.white,
               ),
               child: sig.signatureBytes == null
                   ? Center(
@@ -1486,8 +1310,8 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
                           Icon(Icons.cloud_upload_rounded, size: 40, color: Colors.grey.shade400),
                           const SizedBox(height: 8),
                           Text(
-                            'Klik untuk upload',
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                            'Klik untuk upload gambar',
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                           ),
                         ],
                       ),
@@ -1499,17 +1323,16 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
             ),
           ),
           if (sig.signatureBytes != null) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
+            const SizedBox(height: 12),
+            Center(
               child: OutlinedButton.icon(
                 onPressed: () => setState(() => sig.signatureBytes = null),
-                icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: const Text('Hapus Gambar'),
+                icon: Icon(Icons.refresh_rounded, size: 16, color: Colors.grey.shade600),
+                label: Text('Ganti Gambar', style: TextStyle(color: Colors.grey.shade600)),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 ),
               ),
             ),
@@ -1518,7 +1341,7 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
       ],
     );
   }
-  
+
   Widget _buildNotesCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1550,19 +1373,48 @@ class _KontenEvaluasiState extends State<KontenEvaluasi> {
   }
 }
 
+// Custom painter for grid pattern
+class _GridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFE5E7EB)
+      ..strokeWidth = 0.5;
+    
+    const spacing = 20.0;
+    
+    // Vertical lines
+    for (double x = 0; x <= size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    
+    // Horizontal lines
+    for (double y = 0; y <= size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 // Helper class to hold signature data
 class _SignatureData {
   final TextEditingController nameController;
+  final TextEditingController jabatanController;
   final SignatureController signatureController;
   Uint8List? signatureBytes;
   String mode; // 'draw' or 'upload'
   String role; // 'Atasan', 'Karyawan', 'HCGS', 'Fungsional'
+  String status; // 'Diketahui' or 'Disetujui'
   
   _SignatureData({
     required this.nameController,
+    required this.jabatanController,
     required this.signatureController,
     this.signatureBytes,
     this.mode = 'draw',
     this.role = 'Atasan',
+    this.status = 'Diketahui',
   });
 }

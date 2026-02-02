@@ -53,12 +53,22 @@ class Evaluasi {
   // Signatures - Role-based
   final String? atasanSignatureBase64;
   final String? atasanSignatureNama;
+  final String? atasanSignatureStatus;
   final String? karyawanSignatureBase64;
   final String? karyawanSignatureNama;
+  final String? karyawanSignatureStatus;
   final String? hcgsSignatureBase64;
   final String? hcgsSignatureNama;
+  final String? hcgsSignatureStatus;
   final String? fungsionalSignatureBase64;
-  final String? fungsionalSignatureNama;
+  final String? fungsionalSignatureNama; // Default/Fallback name
+  final String? fungsionalSignatureStatus;
+  
+  // Custom Jabatan (Role) Titles
+  final String? atasanSignatureJabatan;
+  final String? karyawanSignatureJabatan;
+  final String? hcgsSignatureJabatan;
+  final String? fungsionalSignatureJabatan;
   
   // Legacy fields (kept for backward compatibility)
   final String? signatureBase64;
@@ -93,12 +103,21 @@ class Evaluasi {
     // Role-based signatures
     this.atasanSignatureBase64,
     this.atasanSignatureNama,
+    this.atasanSignatureStatus,
     this.karyawanSignatureBase64,
     this.karyawanSignatureNama,
+    this.karyawanSignatureStatus,
     this.hcgsSignatureBase64,
     this.hcgsSignatureNama,
+    this.hcgsSignatureStatus,
     this.fungsionalSignatureBase64,
     this.fungsionalSignatureNama,
+    this.fungsionalSignatureStatus,
+    // Custom Jabatan
+    this.atasanSignatureJabatan,
+    this.karyawanSignatureJabatan,
+    this.hcgsSignatureJabatan,
+    this.fungsionalSignatureJabatan,
     // Legacy
     this.signatureBase64,
     this.hcgsAdminName = '',
@@ -136,12 +155,20 @@ class Evaluasi {
     int? mangkir,
     String? atasanSignatureBase64,
     String? atasanSignatureNama,
+    String? atasanSignatureStatus,
     String? karyawanSignatureBase64,
     String? karyawanSignatureNama,
+    String? karyawanSignatureStatus,
     String? hcgsSignatureBase64,
     String? hcgsSignatureNama,
+    String? hcgsSignatureStatus,
     String? fungsionalSignatureBase64,
     String? fungsionalSignatureNama,
+    String? fungsionalSignatureStatus,
+    String? atasanSignatureJabatan,
+    String? karyawanSignatureJabatan,
+    String? hcgsSignatureJabatan,
+    String? fungsionalSignatureJabatan,
     String? signatureBase64,
     String? hcgsAdminName,
   }) {
@@ -173,12 +200,20 @@ class Evaluasi {
       mangkir: mangkir ?? this.mangkir,
       atasanSignatureBase64: atasanSignatureBase64 ?? this.atasanSignatureBase64,
       atasanSignatureNama: atasanSignatureNama ?? this.atasanSignatureNama,
+      atasanSignatureStatus: atasanSignatureStatus ?? this.atasanSignatureStatus,
       karyawanSignatureBase64: karyawanSignatureBase64 ?? this.karyawanSignatureBase64,
       karyawanSignatureNama: karyawanSignatureNama ?? this.karyawanSignatureNama,
+      karyawanSignatureStatus: karyawanSignatureStatus ?? this.karyawanSignatureStatus,
       hcgsSignatureBase64: hcgsSignatureBase64 ?? this.hcgsSignatureBase64,
       hcgsSignatureNama: hcgsSignatureNama ?? this.hcgsSignatureNama,
+      hcgsSignatureStatus: hcgsSignatureStatus ?? this.hcgsSignatureStatus,
       fungsionalSignatureBase64: fungsionalSignatureBase64 ?? this.fungsionalSignatureBase64,
       fungsionalSignatureNama: fungsionalSignatureNama ?? this.fungsionalSignatureNama,
+      fungsionalSignatureStatus: fungsionalSignatureStatus ?? this.fungsionalSignatureStatus,
+      atasanSignatureJabatan: atasanSignatureJabatan ?? this.atasanSignatureJabatan,
+      karyawanSignatureJabatan: karyawanSignatureJabatan ?? this.karyawanSignatureJabatan,
+      hcgsSignatureJabatan: hcgsSignatureJabatan ?? this.hcgsSignatureJabatan,
+      fungsionalSignatureJabatan: fungsionalSignatureJabatan ?? this.fungsionalSignatureJabatan,
       signatureBase64: signatureBase64 ?? this.signatureBase64,
       hcgsAdminName: hcgsAdminName ?? this.hcgsAdminName,
     );

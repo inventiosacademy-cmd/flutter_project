@@ -44,12 +44,22 @@ class EvaluasiData {
   // Role-based Signatures (base64 encoded images)
   final String? atasanSignatureBase64;
   final String? atasanSignatureNama;
+  final String? atasanSignatureStatus; // 'Diketahui' or 'Disetujui'
   final String? karyawanSignatureBase64;
   final String? karyawanSignatureNama;
+  final String? karyawanSignatureStatus;
   final String? hcgsSignatureBase64;
   final String? hcgsSignatureNama;
+  final String? hcgsSignatureStatus;
   final String? fungsionalSignatureBase64;
   final String? fungsionalSignatureNama;
+  final String? fungsionalSignatureStatus;
+  
+  // Custom Jabatan
+  final String? atasanSignatureJabatan;
+  final String? karyawanSignatureJabatan;
+  final String? hcgsSignatureJabatan;
+  final String? fungsionalSignatureJabatan;
   
   // Legacy fields
   final String? signatureBase64;
@@ -78,12 +88,21 @@ class EvaluasiData {
     // Role-based signatures
     this.atasanSignatureBase64,
     this.atasanSignatureNama,
+    this.atasanSignatureStatus,
     this.karyawanSignatureBase64,
     this.karyawanSignatureNama,
+    this.karyawanSignatureStatus,
     this.hcgsSignatureBase64,
     this.hcgsSignatureNama,
+    this.hcgsSignatureStatus,
     this.fungsionalSignatureBase64,
     this.fungsionalSignatureNama,
+    this.fungsionalSignatureStatus,
+    // Custom Jabatan
+    this.atasanSignatureJabatan,
+    this.karyawanSignatureJabatan,
+    this.hcgsSignatureJabatan,
+    this.fungsionalSignatureJabatan,
     // Legacy
     this.signatureBase64,
     this.hcgsAdminName = '',
@@ -232,7 +251,7 @@ class EvaluasiPdfGenerator {
           pw.SizedBox(height: 24),
           
           // SIGNATURES
-          _buildSignatureSection(data, labelStyle, valueStyle, smallStyle, dateFormat),
+          _buildSignatureSection(data, labelStyle, valueStyle, smallStyle, smallBoldStyle, dateFormat),
         ],
       ),
     );
@@ -726,6 +745,7 @@ class EvaluasiPdfGenerator {
     pw.TextStyle labelStyle,
     pw.TextStyle valueStyle,
     pw.TextStyle smallStyle,
+    pw.TextStyle smallBoldStyle,
     DateFormat dateFormat,
   ) {
     // Convert base64 signatures to images if available
@@ -797,127 +817,119 @@ class EvaluasiPdfGenerator {
         3: const pw.FlexColumnWidth(1),
       },
       children: [
+        // Header Row (Jabatan)
         pw.TableRow(
+          decoration: pw.BoxDecoration(color: PdfColors.grey200),
           children: [
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Text('Diketahui oleh,', style: smallStyle, textAlign: pw.TextAlign.center),
-            ),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Text('Disetujui oleh,', style: smallStyle, textAlign: pw.TextAlign.center),
-            ),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Text('Diketahui oleh,', style: smallStyle, textAlign: pw.TextAlign.center),
-            ),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Text('Disetujui oleh,', style: smallStyle, textAlign: pw.TextAlign.center),
-            ),
+            _buildSignatureHeader(
+                (data.karyawanSignatureJabatan != null && data.karyawanSignatureJabatan!.isNotEmpty) 
+                    ? data.karyawanSignatureJabatan! 
+                    : 'Yang Dinilai', 
+                smallBoldStyle),
+            _buildSignatureHeader(
+                (data.atasanSignatureJabatan != null && data.atasanSignatureJabatan!.isNotEmpty) 
+                    ? data.atasanSignatureJabatan! 
+                    : 'Atasan Langsung', 
+                smallBoldStyle),
+            _buildSignatureHeader(
+                (data.hcgsSignatureJabatan != null && data.hcgsSignatureJabatan!.isNotEmpty) 
+                    ? data.hcgsSignatureJabatan! 
+                    : 'HCGS', 
+                smallBoldStyle),
+            _buildSignatureHeader(
+                (data.fungsionalSignatureJabatan != null && data.fungsionalSignatureJabatan!.isNotEmpty) 
+                    ? data.fungsionalSignatureJabatan! 
+                    : 'Fungsional', 
+                smallBoldStyle),
           ],
         ),
+        
+        // Status Row ("Diketahui oleh" etc) - Removed as per typical form structure, or keep it inside
+        // The original code had "Diketahui oleh" etc.
+        // Let's keep it consistent: Header is the Role (Jabatan).
+        // Then the status row below it.
         pw.TableRow(
           children: [
-            // Karyawan signature
-            pw.Container(
-              height: 50,
-              child: karyawanSignatureImage != null
-                  ? pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Image(karyawanSignatureImage, fit: pw.BoxFit.contain),
-                    )
-                  : pw.Container(),
-            ),
-            // Atasan signature
-            pw.Container(
-              height: 50,
-              child: atasanSignatureImage != null
-                  ? pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Image(atasanSignatureImage, fit: pw.BoxFit.contain),
-                    )
-                  : pw.Container(),
-            ),
-            // HCGS signature
-            pw.Container(
-              height: 50,
-              child: hcgsSignatureImage != null
-                  ? pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Image(hcgsSignatureImage, fit: pw.BoxFit.contain),
-                    )
-                  : pw.Container(),
-            ),
-            // Fungsional signature
-            pw.Container(
-              height: 50,
-              child: fungsionalSignatureImage != null
-                  ? pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Image(fungsionalSignatureImage, fit: pw.BoxFit.contain),
-                    )
-                  : pw.Container(),
-            ),
+            _buildSignatureStatusCell(data.karyawanSignatureStatus ?? 'Diketahui', smallStyle),
+            _buildSignatureStatusCell(data.atasanSignatureStatus ?? 'Disetujui', smallStyle),
+            _buildSignatureStatusCell(data.hcgsSignatureStatus ?? 'Diketahui', smallStyle),
+            _buildSignatureStatusCell(data.fungsionalSignatureStatus ?? 'Disetujui', smallStyle),
           ],
         ),
+        
+        // Image Row
         pw.TableRow(
           children: [
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    '(${data.karyawanSignatureNama ?? data.namaKaryawan})', 
-                    style: smallStyle
-                  ),
-                  pw.Text('Karyawan', style: smallStyle),
-                  pw.Text('Tanggal:', style: smallStyle),
-                ],
-              ),
-            ),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    '(${data.atasanSignatureNama ?? data.atasanLangsung})', 
-                    style: smallStyle
-                  ),
-                  pw.Text('Atasan Langsung', style: smallStyle),
-                  pw.Text('Tanggal:', style: smallStyle),
-                ],
-              ),
-            ),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    '(${data.hcgsSignatureNama ?? (data.hcgsAdminName.isNotEmpty ? data.hcgsAdminName : "                    ")})', 
-                    style: smallStyle
-                  ),
-                  pw.Text('HCGS', style: smallStyle),
-                  pw.Text('Tanggal:', style: smallStyle),
-                ],
-              ),
-            ),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(6),
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    '(${data.fungsionalSignatureNama ?? "                    "})', 
-                    style: smallStyle
-                  ),
-                  pw.Text('Fungsional', style: smallStyle),
-                  pw.Text('Tanggal:', style: smallStyle),
-                ],
-              ),
-            ),
+            _buildSignatureImageCell(karyawanSignatureImage),
+            _buildSignatureImageCell(atasanSignatureImage),
+            _buildSignatureImageCell(hcgsSignatureImage),
+            _buildSignatureImageCell(fungsionalSignatureImage),
           ],
         ),
+        
+        // Name Row
+        pw.TableRow(
+          children: [
+            _buildSignatureNameCell(data.karyawanSignatureNama ?? data.namaKaryawan, smallStyle),
+            _buildSignatureNameCell(data.atasanSignatureNama ?? '', smallStyle),
+            _buildSignatureNameCell(data.hcgsSignatureNama ?? data.hcgsAdminName, smallStyle),
+            _buildSignatureNameCell(data.fungsionalSignatureNama ?? '', smallStyle),
+          ],
+        ),
+        
+        // Date Row
+        pw.TableRow(
+          children: [
+             _buildSignatureDateCell('Tanggal:', smallStyle),
+             _buildSignatureDateCell('Tanggal:', smallStyle),
+             _buildSignatureDateCell('Tanggal:', smallStyle),
+             _buildSignatureDateCell('Tanggal:', smallStyle),
+          ]
+        )
       ],
+    );
+  }
+
+  static pw.Widget _buildSignatureHeader(String text, pw.TextStyle style) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(4),
+      alignment: pw.Alignment.center,
+      child: pw.Text(text, style: style, textAlign: pw.TextAlign.center),
+    );
+  }
+  
+  static pw.Widget _buildSignatureStatusCell(String status, pw.TextStyle style) {
+      return pw.Container(
+      padding: const pw.EdgeInsets.all(2),
+      alignment: pw.Alignment.center,
+      child: pw.Text('$status oleh,', style: style, textAlign: pw.TextAlign.center),
+    );
+  }
+
+  static pw.Widget _buildSignatureNameCell(String text, pw.TextStyle style) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(4),
+      alignment: pw.Alignment.center,
+      child: pw.Text('($text)', style: style, textAlign: pw.TextAlign.center),
+    );
+  }
+  
+  static pw.Widget _buildSignatureDateCell(String text, pw.TextStyle style) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(4),
+      alignment: pw.Alignment.centerLeft,
+      child: pw.Text(text, style: style),
+    );
+  }
+
+  static pw.Widget _buildSignatureImageCell(pw.MemoryImage? image) {
+    return pw.Container(
+      height: 60,
+      padding: const pw.EdgeInsets.all(4),
+      alignment: pw.Alignment.center,
+      child: image != null
+          ? pw.Image(image, fit: pw.BoxFit.contain)
+          : pw.SizedBox(),
     );
   }
   

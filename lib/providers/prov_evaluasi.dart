@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/evaluasi.dart';
+import '../utils/error_helper.dart';
 
 class EvaluasiProvider with ChangeNotifier {
   List<Evaluasi> _evaluasiList = [];
@@ -19,7 +20,7 @@ class EvaluasiProvider with ChangeNotifier {
   CollectionReference<Map<String, dynamic>> get _evaluasiCollection {
     final userId = _userId;
     if (userId == null) {
-      throw Exception('User not logged in');
+      throw Exception('User belum login');
     }
     return FirebaseFirestore.instance
         .collection('users')
@@ -38,7 +39,7 @@ class EvaluasiProvider with ChangeNotifier {
       _evaluasiList = snapshot.docs.map((doc) => _fromFirestore(doc)).toList();
       notifyListeners();
     }, onError: (e) {
-      _error = e.toString();
+      _error = ErrorHelper.getErrorMessage(e, context: 'Evaluasi');
       notifyListeners();
     });
   }
@@ -76,8 +77,23 @@ class EvaluasiProvider with ChangeNotifier {
       terlambat: data['terlambat'] ?? 0,
       mangkir: data['mangkir'] ?? 0,
       signatureBase64: data['signatureBase64'],
+      atasanSignatureBase64: data['atasanSignatureBase64'],
+      atasanSignatureNama: data['atasanSignatureNama'],
+      atasanSignatureStatus: data['atasanSignatureStatus'],
+      karyawanSignatureBase64: data['karyawanSignatureBase64'],
+      karyawanSignatureNama: data['karyawanSignatureNama'],
+      karyawanSignatureStatus: data['karyawanSignatureStatus'],
       hcgsAdminName: data['hcgsAdminName'] ?? '',
       hcgsSignatureBase64: data['hcgsSignatureBase64'],
+      hcgsSignatureNama: data['hcgsSignatureNama'],
+      hcgsSignatureStatus: data['hcgsSignatureStatus'],
+      fungsionalSignatureBase64: data['fungsionalSignatureBase64'],
+      fungsionalSignatureNama: data['fungsionalSignatureNama'],
+      fungsionalSignatureStatus: data['fungsionalSignatureStatus'],
+      atasanSignatureJabatan: data['atasanSignatureJabatan'],
+      karyawanSignatureJabatan: data['karyawanSignatureJabatan'],
+      hcgsSignatureJabatan: data['hcgsSignatureJabatan'],
+      fungsionalSignatureJabatan: data['fungsionalSignatureJabatan'],
     );
   }
 
@@ -109,8 +125,23 @@ class EvaluasiProvider with ChangeNotifier {
       'terlambat': evaluasi.terlambat,
       'mangkir': evaluasi.mangkir,
       'signatureBase64': evaluasi.signatureBase64,
+      'atasanSignatureBase64': evaluasi.atasanSignatureBase64,
+      'atasanSignatureNama': evaluasi.atasanSignatureNama,
+      'atasanSignatureStatus': evaluasi.atasanSignatureStatus,
+      'karyawanSignatureBase64': evaluasi.karyawanSignatureBase64,
+      'karyawanSignatureNama': evaluasi.karyawanSignatureNama,
+      'karyawanSignatureStatus': evaluasi.karyawanSignatureStatus,
       'hcgsAdminName': evaluasi.hcgsAdminName,
       'hcgsSignatureBase64': evaluasi.hcgsSignatureBase64,
+      'hcgsSignatureNama': evaluasi.hcgsSignatureNama,
+      'hcgsSignatureStatus': evaluasi.hcgsSignatureStatus,
+      'fungsionalSignatureBase64': evaluasi.fungsionalSignatureBase64,
+      'fungsionalSignatureNama': evaluasi.fungsionalSignatureNama,
+      'fungsionalSignatureStatus': evaluasi.fungsionalSignatureStatus,
+      'atasanSignatureJabatan': evaluasi.atasanSignatureJabatan,
+      'karyawanSignatureJabatan': evaluasi.karyawanSignatureJabatan,
+      'hcgsSignatureJabatan': evaluasi.hcgsSignatureJabatan,
+      'fungsionalSignatureJabatan': evaluasi.fungsionalSignatureJabatan,
     };
   }
 
@@ -126,9 +157,9 @@ class EvaluasiProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
-      _error = e.toString();
+      _error = ErrorHelper.getErrorMessage(e, context: 'Evaluasi');
       notifyListeners();
-      rethrow;
+      throw Exception(_error);
     }
   }
 
@@ -144,9 +175,9 @@ class EvaluasiProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
-      _error = e.toString();
+      _error = ErrorHelper.getErrorMessage(e, context: 'Evaluasi');
       notifyListeners();
-      rethrow;
+      throw Exception(_error);
     }
   }
 
@@ -162,11 +193,13 @@ class EvaluasiProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
-      _error = e.toString();
+      _error = ErrorHelper.getErrorMessage(e, context: 'Evaluasi');
       notifyListeners();
-      rethrow;
+      throw Exception(_error);
     }
   }
+
+
 
   // Get filtered evaluations
   List<Evaluasi> getFilteredEvaluasi({

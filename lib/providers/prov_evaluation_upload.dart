@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/evaluation_upload.dart';
+import '../utils/error_helper.dart';
 
 class EvaluationUploadProvider with ChangeNotifier {
   final Map<String, List<EvaluationUpload>> _evaluationUploads = {};
@@ -52,6 +53,8 @@ class EvaluationUploadProvider with ChangeNotifier {
     });
   }
 
+
+
   /// Add new evaluation upload to Firestore
   Future<void> addEvaluationUpload(EvaluationUpload document) async {
     final userId = _auth.currentUser?.uid;
@@ -71,8 +74,8 @@ class EvaluationUploadProvider with ChangeNotifier {
       
       debugPrint('Evaluation upload added successfully: ${document.fileName}');
     } catch (e) {
-      debugPrint('Error adding evaluation upload:$e');
-      rethrow;
+      debugPrint('Error adding evaluation upload: $e');
+      throw Exception(ErrorHelper.getErrorMessage(e, context: 'menyimpan evaluasi'));
     }
   }
 

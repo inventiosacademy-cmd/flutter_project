@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import '../models/karyawan.dart';
 import '../services/activity_service.dart';
+import '../utils/error_helper.dart';
 
 class EmployeeProvider with ChangeNotifier {
   List<Employee> _employees = [];
@@ -54,6 +54,8 @@ class EmployeeProvider with ChangeNotifier {
     });
   }
 
+
+
   List<Employee> get employees => [..._employees];
   bool get isLoading => _isLoading;
 
@@ -65,7 +67,9 @@ class EmployeeProvider with ChangeNotifier {
   }
 
   Future<void> addEmployee(Employee employee) async {
-    if (_userId == null) return;
+    if (_userId == null) {
+      throw Exception('Sesi login telah berakhir. Silakan login kembali.');
+    }
     try {
       await _firestore
           .collection('users')
@@ -84,7 +88,7 @@ class EmployeeProvider with ChangeNotifier {
       );
     } catch (e) {
       debugPrint("Error adding employee: $e");
-      rethrow;
+      throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
     }
   }
 
@@ -93,7 +97,10 @@ class EmployeeProvider with ChangeNotifier {
     debugPrint("Current userId: $_userId");
     
     if (_userId == null || employees.isEmpty) {
-      debugPrint("Cannot save: userId is null or employees list is empty");
+      if (_userId == null) {
+        throw Exception('Sesi login telah berakhir. Silakan login kembali.');
+      }
+      debugPrint("Employee list is empty, nothing to import");
       return;
     }
     
@@ -123,13 +130,14 @@ class EmployeeProvider with ChangeNotifier {
       );
     } catch (e) {
       debugPrint("Error adding employees batch: $e");
-      debugPrint("Full error details: $e");
-      rethrow;
+      throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
     }
   }
 
   Future<void> updateEmployee(Employee employee) async {
-    if (_userId == null) return;
+    if (_userId == null) {
+      throw Exception('Sesi login telah berakhir. Silakan login kembali.');
+    }
     try {
       await _firestore
           .collection('users')
@@ -148,12 +156,14 @@ class EmployeeProvider with ChangeNotifier {
       );
     } catch (e) {
       debugPrint("Error updating employee: $e");
-      rethrow;
+      throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
     }
   }
 
   Future<void> deleteEmployee(String id) async {
-    if (_userId == null) return;
+    if (_userId == null) {
+      throw Exception('Sesi login telah berakhir. Silakan login kembali.');
+    }
     try {
       await _firestore
           .collection('users')
@@ -171,6 +181,7 @@ class EmployeeProvider with ChangeNotifier {
       );
     } catch (e) {
       debugPrint("Error deleting employee: $e");
+      throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
     }
   }
 }

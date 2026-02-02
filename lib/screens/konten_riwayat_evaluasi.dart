@@ -942,7 +942,27 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
       mangkir: evaluasi.mangkir,
       signatureBase64: evaluasi.signatureBase64,
       hcgsAdminName: evaluasi.hcgsAdminName.isNotEmpty ? evaluasi.hcgsAdminName : 'Admin HCGS',
+      
+      // Fixed 4 Signature Slots
+      karyawanSignatureBase64: evaluasi.karyawanSignatureBase64,
+      karyawanSignatureNama: evaluasi.karyawanSignatureNama,
+      karyawanSignatureJabatan: evaluasi.karyawanSignatureJabatan,
+      karyawanSignatureStatus: evaluasi.karyawanSignatureStatus,
+      
+      atasanSignatureBase64: evaluasi.atasanSignatureBase64,
+      atasanSignatureNama: evaluasi.atasanSignatureNama,
+      atasanSignatureJabatan: evaluasi.atasanSignatureJabatan,
+      atasanSignatureStatus: evaluasi.atasanSignatureStatus,
+      
       hcgsSignatureBase64: evaluasi.hcgsSignatureBase64,
+      hcgsSignatureNama: evaluasi.hcgsSignatureNama,
+      hcgsSignatureJabatan: evaluasi.hcgsSignatureJabatan,
+      hcgsSignatureStatus: evaluasi.hcgsSignatureStatus,
+      
+      fungsionalSignatureBase64: evaluasi.fungsionalSignatureBase64,
+      fungsionalSignatureNama: evaluasi.fungsionalSignatureNama,
+      fungsionalSignatureJabatan: evaluasi.fungsionalSignatureJabatan,
+      fungsionalSignatureStatus: evaluasi.fungsionalSignatureStatus,
     );
 
     ModernPdfPreviewDialog.show(

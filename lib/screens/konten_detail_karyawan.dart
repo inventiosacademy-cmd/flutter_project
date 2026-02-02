@@ -350,32 +350,12 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                 ),
               ],
             ),
-            ElevatedButton.icon(
-              onPressed: () {
-                EvaluationUploadDialog.show(context, widget.employee.id);
-              },
-              icon: const Icon(Icons.upload_file, size: 18),
-              label: const Text("Upload Evaluasi"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 32),
         
         // Timeline design for evaluations
         _buildEvaluationTimeline(),
-        
-        const SizedBox(height: 32),
-        
-        // Uploaded Evaluations Section
-        _buildUploadedEvaluationsSection(),
       ],
     );
   }
@@ -506,7 +486,27 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
       mangkir: evaluasi.mangkir,
       signatureBase64: evaluasi.signatureBase64,
       hcgsAdminName: evaluasi.hcgsAdminName.isNotEmpty ? evaluasi.hcgsAdminName : 'Admin HCGS',
+      
+      // Fixed 4 Signature Slots
+      karyawanSignatureBase64: evaluasi.karyawanSignatureBase64,
+      karyawanSignatureNama: evaluasi.karyawanSignatureNama,
+      karyawanSignatureJabatan: evaluasi.karyawanSignatureJabatan,
+      karyawanSignatureStatus: evaluasi.karyawanSignatureStatus,
+      
+      atasanSignatureBase64: evaluasi.atasanSignatureBase64,
+      atasanSignatureNama: evaluasi.atasanSignatureNama,
+      atasanSignatureJabatan: evaluasi.atasanSignatureJabatan,
+      atasanSignatureStatus: evaluasi.atasanSignatureStatus,
+      
       hcgsSignatureBase64: evaluasi.hcgsSignatureBase64,
+      hcgsSignatureNama: evaluasi.hcgsSignatureNama,
+      hcgsSignatureJabatan: evaluasi.hcgsSignatureJabatan,
+      hcgsSignatureStatus: evaluasi.hcgsSignatureStatus,
+      
+      fungsionalSignatureBase64: evaluasi.fungsionalSignatureBase64,
+      fungsionalSignatureNama: evaluasi.fungsionalSignatureNama,
+      fungsionalSignatureJabatan: evaluasi.fungsionalSignatureJabatan,
+      fungsionalSignatureStatus: evaluasi.fungsionalSignatureStatus,
     );
 
     ModernPdfPreviewDialog.show(
@@ -550,21 +550,6 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                   ),
                 ),
               ],
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                PkwtUploadDialog.show(context, widget.employee.id);
-              },
-              icon: const Icon(Icons.upload_file, size: 18),
-              label: const Text("Upload PKWT"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
             ),
           ],
         ),

@@ -802,6 +802,20 @@ class _DashboardContentState extends State<DashboardContent> {
                     .where((e) => e.pkwtKe == emp.pkwtKe)
                     .isNotEmpty;
                 
+                // Jika expired, tidak perlu evaluasi - tampilkan '-'
+                if (daysLeft <= 0) {
+                  return Center(
+                    child: Text(
+                      "-",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  );
+                }
+                
                 String evalText;
                 Color evalColor;
                 Color evalBgColor;
@@ -844,140 +858,156 @@ class _DashboardContentState extends State<DashboardContent> {
           // Actions
           Expanded(
             flex: 1,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Modern Popup Menu
-                Theme(
-                  data: Theme.of(context).copyWith(
-                    useMaterial3: true,
-                    popupMenuTheme: PopupMenuThemeData(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 3,
-                      surfaceTintColor: Colors.white,
-                    ),
-                  ),
-                  child: PopupMenuButton<String>(
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade200),
+            child: Consumer<EvaluasiProvider>(
+              builder: (context, evaluasiProvider, _) {
+                // Check if employee has evaluation for CURRENT PKWT Ke
+                final hasEvaluation = evaluasiProvider
+                    .getEvaluasiByEmployee(emp.id)
+                    .where((e) => e.pkwtKe == emp.pkwtKe)
+                    .isNotEmpty;
+                
+                // Tentukan apakah tombol evaluasi perlu ditampilkan
+                // Sembunyikan jika: expired (daysLeft <= 0) ATAU sudah evaluasi
+                final showEvaluateButton = daysLeft > 0 && !hasEvaluation;
+                
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Modern Popup Menu
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        useMaterial3: true,
+                        popupMenuTheme: PopupMenuThemeData(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 3,
+                          surfaceTintColor: Colors.white,
+                        ),
                       ),
-                      child: Icon(Icons.more_horiz, size: 20, color: Colors.grey.shade600),
-                    ),
-                    splashRadius: 24,
-                    offset: const Offset(0, 40),
-                    onSelected: (value) {
-                      if (value == 'detail') {
-                        widget.onViewDetail?.call(emp);
-                      } else if (value == 'evaluate') {
-                        widget.onEvaluasi?.call(emp);
-                      } else if (value == 'edit') {
-                        widget.onEdit?.call(emp);
-                      } else if (value == 'upload_pkwt') {
-                        PkwtUploadDialog.show(context, emp.id);
-                      } else if (value == 'delete') {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text("Hapus Karyawan"),
-                            content: Text("Apakah Anda yakin ingin menghapus data ${emp.nama}?"),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text("Batal"),
-                              ),
-                              ElevatedButton(
-                                onPressed: () async {
-                                  Navigator.pop(ctx); // Close dialog
-                                  try {
-                                    await Provider.of<EmployeeProvider>(context, listen: false)
-                                        .deleteEmployee(emp.id);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text("Data karyawan berhasil dihapus"),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text("Gagal menghapus data: $e"),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                child: const Text("Hapus", style: TextStyle(color: Colors.white)),
-                              ),
-                            ],
+                      child: PopupMenuButton<String>(
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                        );
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'detail',
-                        child: Row(
-                          children: [
-                            Icon(Icons.visibility_outlined, size: 18, color: AppColors.primaryBlue),
-                            const SizedBox(width: 12),
-                            Text('Lihat Detail', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
-                          ],
+                          child: Icon(Icons.more_horiz, size: 20, color: Colors.grey.shade600),
                         ),
+                        splashRadius: 24,
+                        offset: const Offset(0, 40),
+                        onSelected: (value) {
+                          if (value == 'detail') {
+                            widget.onViewDetail?.call(emp);
+                          } else if (value == 'evaluate') {
+                            widget.onEvaluasi?.call(emp);
+                          } else if (value == 'edit') {
+                            widget.onEdit?.call(emp);
+                          } else if (value == 'upload_pkwt') {
+                            PkwtUploadDialog.show(context, emp.id);
+                          } else if (value == 'delete') {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text("Hapus Karyawan"),
+                                content: Text("Apakah Anda yakin ingin menghapus data ${emp.nama}?"),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text("Batal"),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx); // Close dialog
+                                      try {
+                                        await Provider.of<EmployeeProvider>(context, listen: false)
+                                            .deleteEmployee(emp.id);
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text("Data karyawan berhasil dihapus"),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text("Gagal menghapus data: $e"),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                    child: const Text("Hapus", style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'detail',
+                            child: Row(
+                              children: [
+                                Icon(Icons.visibility_outlined, size: 18, color: AppColors.primaryBlue),
+                                const SizedBox(width: 12),
+                                Text('Lihat Detail', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined, size: 18, color: Colors.grey.shade700),
+                                const SizedBox(width: 12),
+                                Text('Edit', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                          // Hanya tampilkan tombol Evaluasi jika belum expired dan belum evaluasi
+                          if (showEvaluateButton)
+                            PopupMenuItem(
+                              value: 'evaluate',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.assignment_turned_in_outlined, size: 18, color: Colors.grey.shade700),
+                                  const SizedBox(width: 12),
+                                  Text('Evaluasi', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                            ),
+                          PopupMenuItem(
+                            value: 'upload_pkwt',
+                            child: Row(
+                              children: [
+                                Icon(Icons.upload_file_outlined, size: 18, color: Colors.grey.shade700),
+                                const SizedBox(width: 12),
+                                Text('Upload PKWT', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(height: 1),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                                const SizedBox(width: 12),
+                                const Text('Hapus', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_outlined, size: 18, color: Colors.grey.shade700),
-                            const SizedBox(width: 12),
-                            Text('Edit', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'evaluate',
-                        child: Row(
-                          children: [
-                            Icon(Icons.assignment_turned_in_outlined, size: 18, color: Colors.grey.shade700),
-                            const SizedBox(width: 12),
-                            Text('Evaluasi', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'upload_pkwt',
-                        child: Row(
-                          children: [
-                            Icon(Icons.upload_file_outlined, size: 18, color: Colors.grey.shade700),
-                            const SizedBox(width: 12),
-                            Text('Upload PKWT', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(height: 1),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
-                            const SizedBox(width: 12),
-                            const Text('Hapus', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],

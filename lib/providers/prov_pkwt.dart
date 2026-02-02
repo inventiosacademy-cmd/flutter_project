@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/pkwt_document.dart';
+import '../utils/error_helper.dart';
 
 class PkwtProvider with ChangeNotifier {
   final Map<String, List<PkwtDocument>> _pkwtDocuments = {};
@@ -52,6 +53,8 @@ class PkwtProvider with ChangeNotifier {
     });
   }
 
+
+
   /// Add new PKWT document to Firestore
   Future<void> addPkwtDocument(PkwtDocument document) async {
     final userId = _auth.currentUser?.uid;
@@ -72,7 +75,7 @@ class PkwtProvider with ChangeNotifier {
       debugPrint('PKWT document added successfully: ${document.fileName}');
     } catch (e) {
       debugPrint('Error adding PKWT document: $e');
-      rethrow;
+      throw Exception(ErrorHelper.getErrorMessage(e, context: 'menyimpan PKWT'));
     }
   }
 

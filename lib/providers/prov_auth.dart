@@ -126,8 +126,20 @@ class AuthProvider with ChangeNotifier {
 
   Future<String?> login(String email, String password) async {
     try {
-      if (email.isEmpty || password.isEmpty) {
+      // Validasi input
+      if (email.isEmpty && password.isEmpty) {
         return 'Email dan password harus diisi.';
+      }
+      if (email.isEmpty) {
+        return 'Email harus diisi.';
+      }
+      if (password.isEmpty) {
+        return 'Password harus diisi.';
+      }
+      
+      // Validasi format email sederhana
+      if (!email.contains('@') || !email.contains('.')) {
+        return 'Format email tidak valid.';
       }
       
       await _auth.signInWithEmailAndPassword(email: email, password: password);
@@ -137,17 +149,57 @@ class AuthProvider with ChangeNotifier {
       
       return null; // Success, no error
     } on FirebaseAuthException catch (e) {
-      // SECURITY: Cegah User Enumeration dengan pesan error generik
-      if (e.code == 'user-not-found' || 
-          e.code == 'wrong-password' || 
-          e.code == 'invalid-credential') {
-        return 'Email atau password salah.';
-      } else if (e.code == 'invalid-email') {
-        return 'Format email tidak valid.';
-      }
-      return e.message ?? 'Terjadi kesalahan saat login.';
+      // Tangani error Firebase Auth
+      return _getFirebaseErrorMessage(e.code);
     } catch (e) {
-      return 'Terjadi kesalahan: $e';
+      // Tangani error umum
+      if (e.toString().contains('network')) {
+        return 'Tidak ada koneksi internet. Periksa koneksi Anda.';
+      }
+      return 'Terjadi kesalahan tidak terduga. Silakan coba lagi.';
+    }
+  }
+
+  /// Konversi kode error Firebase ke pesan bahasa Indonesia
+  String _getFirebaseErrorMessage(String code) {
+    switch (code) {
+      // Credential errors - gunakan pesan generik untuk keamanan
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'Email atau password salah.';
+      
+      // Email errors
+      case 'invalid-email':
+        return 'Format email tidak valid.';
+      case 'user-disabled':
+        return 'Akun ini telah dinonaktifkan. Hubungi administrator.';
+      
+      // Rate limiting
+      case 'too-many-requests':
+        return 'Terlalu banyak percobaan login. Silakan tunggu beberapa menit.';
+      
+      // Network errors
+      case 'network-request-failed':
+        return 'Tidak ada koneksi internet. Periksa koneksi Anda.';
+      
+      // Operation errors
+      case 'operation-not-allowed':
+        return 'Login dengan email/password tidak diaktifkan.';
+      
+      // Account errors
+      case 'account-exists-with-different-credential':
+        return 'Akun dengan email ini sudah ada dengan metode login lain.';
+      
+      // Timeout
+      case 'timeout':
+        return 'Koneksi timeout. Silakan coba lagi.';
+      
+      // Default
+      default:
+        debugPrint('Unhandled Firebase Auth Error: $code');
+        return 'Terjadi kesalahan saat login. Silakan coba lagi.';
     }
   }
 
