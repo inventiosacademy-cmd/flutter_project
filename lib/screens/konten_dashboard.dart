@@ -5,8 +5,6 @@ import '../providers/prov_karyawan.dart';
 import '../providers/prov_evaluasi.dart';
 import '../models/karyawan.dart';
 import '../theme/warna.dart';
-import '../widgets/import_dialog.dart';
-import '../widgets/pkwt_upload_dialog.dart';
 
 class DashboardContent extends StatefulWidget {
   final VoidCallback? onTambahKaryawan;
@@ -101,24 +99,6 @@ class _DashboardContentState extends State<DashboardContent> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _showImportDialog(),
-                      icon: const Icon(Icons.upload_outlined, size: 18),
-                      label: const Text("Import"),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey.shade700,
-                        side: BorderSide(color: Colors.grey.shade300),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: widget.onTambahKaryawan,
                       icon: const Icon(Icons.add, size: 18),
@@ -902,8 +882,6 @@ class _DashboardContentState extends State<DashboardContent> {
                             widget.onEvaluasi?.call(emp);
                           } else if (value == 'edit') {
                             widget.onEdit?.call(emp);
-                          } else if (value == 'upload_pkwt') {
-                            PkwtUploadDialog.show(context, emp.id);
                           } else if (value == 'delete') {
                             showDialog(
                               context: context,
@@ -981,16 +959,6 @@ class _DashboardContentState extends State<DashboardContent> {
                                 ],
                               ),
                             ),
-                          PopupMenuItem(
-                            value: 'upload_pkwt',
-                            child: Row(
-                              children: [
-                                Icon(Icons.upload_file_outlined, size: 18, color: Colors.grey.shade700),
-                                const SizedBox(width: 12),
-                                Text('Upload PKWT', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
-                              ],
-                            ),
-                          ),
                           const PopupMenuDivider(height: 1),
                           PopupMenuItem(
                             value: 'delete',
@@ -1024,12 +992,5 @@ class _DashboardContentState extends State<DashboardContent> {
       const Color(0xFFEF4444),
     ];
     return colors[index % colors.length];
-  }
-
-  void _showImportDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const ImportDialog(),
-    );
   }
 }

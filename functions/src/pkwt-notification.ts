@@ -143,34 +143,35 @@ function createEmailTemplate(employees: Array<Employee & { hariExpired: number }
 }
 
 /**
- * Helper function to check if an employee has been evaluated
+ * Helper function to check if an employee has been evaluated for their CURRENT PKWT Ke
  */
-async function isEmployeeEvaluated(db: admin.firestore.Firestore, userId: string, employeeId: string): Promise<boolean> {
+async function isEmployeeEvaluated(db: admin.firestore.Firestore, userId: string, employeeId: string, currentPkwtKe: number): Promise<boolean> {
     const evaluationsSnapshot = await db
         .collection("users")
         .doc(userId)
-        .collection("evaluasi")  // ← Changed from "evaluations" to "evaluasi"
+        .collection("evaluasi")
         .where("employeeId", "==", employeeId)
+        .where("pkwtKe", "==", currentPkwtKe)  // Check for CURRENT PKWT Ke
         .get();
 
-    console.log(`🔍 Checking evaluation status for employee ${employeeId}: Found ${evaluationsSnapshot.docs.length} evaluation(s)`);
+    console.log(`🔍 Checking evaluation for employee ${employeeId} PKWT Ke-${currentPkwtKe}: Found ${evaluationsSnapshot.docs.length} evaluation(s)`);
 
     // Employee is considered evaluated if there's at least one evaluation
-    // that is NOT in draft status (status: belumTTD or selesai)
+    // for the CURRENT PKWT Ke with completed status (belumTTD or selesai)
     for (const evalDoc of evaluationsSnapshot.docs) {
         const evalData = evalDoc.data();
         const status = evalData.status || "";
 
-        console.log(`  📋 Evaluation ID: ${evalDoc.id}, Status: "${status}"`);
+        console.log(`  📋 Evaluation ID: ${evalDoc.id}, PKWT Ke: ${currentPkwtKe}, Status: "${status}"`);
 
         // If there's a completed evaluation (not draft), employee is evaluated
         if (status === "belumTTD" || status === "selesai") {
-            console.log(`  ✅ Employee ${employeeId} is EVALUATED (status: ${status})`);
+            console.log(`  ✅ Employee ${employeeId} is EVALUATED for PKWT Ke-${currentPkwtKe} (status: ${status})`);
             return true;
         }
     }
 
-    console.log(`  ❌ Employee ${employeeId} is NOT evaluated (no completed evaluations found)`);
+    console.log(`  ❌ Employee ${employeeId} is NOT evaluated for PKWT Ke-${currentPkwtKe}`);
     return false;
 }
 
@@ -256,10 +257,10 @@ export const sendPkwtExpirationNotification = onSchedule(
                         const emp = empDoc.data() as Employee;
                         const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
 
-                        // Only include employees with PKWT expiring within 30 days
+                        // Only include employees with PKWT expiring within 30 days or less
                         if (hariExpired >= 0 && hariExpired <= 30) {
-                            // Check if employee has been evaluated
-                            const hasBeenEvaluated = await isEmployeeEvaluated(db, userId, empDoc.id);
+                            // Check if employee has been evaluated for CURRENT PKWT Ke
+                            const hasBeenEvaluated = await isEmployeeEvaluated(db, userId, empDoc.id, emp.pkwtKe);
 
                             // Only add if NOT evaluated
                             if (!hasBeenEvaluated) {
@@ -290,48 +291,45 @@ export const sendPkwtExpirationNotification = onSchedule(
                         hariSebelumExpired: [30, 14, 7, 3, 1],
                     });
 
-                    // Send ONE EMAIL PER EMPLOYEE
-                    for (const employee of unevaluatedExpiringEmployees) {
-                        try {
-                            // Create email template for single employee
-                            const emailHtml = createEmailTemplate([employee]);
+                    // Send ONE EMAIL with ALL employees
+                    try {
+                        // Create email template with ALL employees
+                        const emailHtml = createEmailTemplate(unevaluatedExpiringEmployees);
 
-                            const mailOptions = {
-                                from: `"HR Dashboard" <${emailPengirim}>`,
-                                to: emailPenerima,
-                                subject: `⚠️ [HR Dashboard] PKWT ${employee.nama} Segera Berakhir (${employee.hariExpired} Hari)`,
-                                html: emailHtml,
-                            };
+                        const mailOptions = {
+                            from: `"HR Dashboard" <${emailPengirim}>`,
+                            to: emailPenerima,
+                            subject: `⚠️ [HR Dashboard] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
+                            html: emailHtml,
+                        };
 
-                            await transporter.sendMail(mailOptions);
+                        await transporter.sendMail(mailOptions);
 
-                            console.log(`✅ User ${userId}: Email sent for employee ${employee.nama} (${employee.hariExpired} days) to ${emailPenerima}`);
-                            totalEmailsSent++;
+                        console.log(`✅ User ${userId}: Email sent with ${unevaluatedExpiringEmployees.length} employees to ${emailPenerima}`);
+                        totalEmailsSent++;
 
-                            // Log notification for this employee
-                            await db.collection("notification_logs").add({
-                                sentAt: admin.firestore.FieldValue.serverTimestamp(),
-                                userId: userId,
-                                recipientEmail: emailPenerima,
-                                employeeId: employee.id,
-                                employeeName: employee.nama,
-                                hariExpired: employee.hariExpired,
-                                status: "success",
-                            });
+                        // Log notification for all employees in this batch
+                        const employeeNames = unevaluatedExpiringEmployees.map(e => e.nama).join(", ");
+                        await db.collection("notification_logs").add({
+                            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                            userId: userId,
+                            recipientEmail: emailPenerima,
+                            employeeCount: unevaluatedExpiringEmployees.length,
+                            employeeNames: employeeNames,
+                            status: "success",
+                        });
 
-                        } catch (emailError) {
-                            console.error(`❌ Error sending email for employee ${employee.nama}:`, emailError);
+                    } catch (emailError) {
+                        console.error(`❌ Error sending email for user ${userId}:`, emailError);
 
-                            // Log error for this specific employee
-                            await db.collection("notification_logs").add({
-                                sentAt: admin.firestore.FieldValue.serverTimestamp(),
-                                userId: userId,
-                                employeeId: employee.id,
-                                employeeName: employee.nama,
-                                status: "error",
-                                error: String(emailError),
-                            });
-                        }
+                        // Log error for this user
+                        await db.collection("notification_logs").add({
+                            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                            userId: userId,
+                            employeeCount: unevaluatedExpiringEmployees.length,
+                            status: "error",
+                            error: String(emailError),
+                        });
                     }
 
                     totalEmployeesNotified += unevaluatedExpiringEmployees.length;
@@ -517,9 +515,10 @@ export const testEmailNotification = onRequest(
                 const emp = empDoc.data() as Employee;
                 const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
 
+                // Only include employees with PKWT expiring within 30 days or less
                 if (hariExpired >= 0 && hariExpired <= 30) {
-                    // Check if employee has been evaluated
-                    const hasBeenEvaluated = await isEmployeeEvaluated(db, testUserId!, empDoc.id);
+                    // Check if employee has been evaluated for CURRENT PKWT Ke
+                    const hasBeenEvaluated = await isEmployeeEvaluated(db, testUserId!, empDoc.id, emp.pkwtKe);
 
                     // Only add if NOT evaluated
                     if (!hasBeenEvaluated) {
@@ -551,41 +550,40 @@ export const testEmailNotification = onRequest(
                 hariSebelumExpired: [30, 14, 7, 3, 1],
             });
 
-            let emailsSent = 0;
-            const sentEmployees: Array<{ nama: string; hariExpired: number }> = [];
+            // Send ONE EMAIL with ALL employees
+            try {
+                const emailHtml = createEmailTemplate(unevaluatedExpiringEmployees);
 
-            // Send ONE EMAIL PER EMPLOYEE
-            for (const employee of unevaluatedExpiringEmployees) {
-                try {
-                    const emailHtml = createEmailTemplate([employee]);
+                await transporter.sendMail({
+                    from: `"HR Dashboard" <${emailPengirim}>`,
+                    to: emailPenerima,
+                    subject: `🧪 [TEST] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
+                    html: emailHtml,
+                });
 
-                    await transporter.sendMail({
-                        from: `"HR Dashboard" <${emailPengirim}>`,
-                        to: emailPenerima,
-                        subject: `🧪 [TEST] PKWT ${employee.nama} Segera Berakhir (${employee.hariExpired} Hari)`,
-                        html: emailHtml,
-                    });
+                const sentEmployees = unevaluatedExpiringEmployees.map(e => ({
+                    nama: e.nama,
+                    hariExpired: e.hariExpired
+                }));
 
-                    emailsSent++;
-                    sentEmployees.push({
-                        nama: employee.nama,
-                        hariExpired: employee.hariExpired
-                    });
+                console.log(`✅ Test email sent with ${unevaluatedExpiringEmployees.length} employees`);
 
-                    console.log(`✅ Test email sent for employee ${employee.nama}`);
-                } catch (emailError) {
-                    console.error(`❌ Error sending email for employee ${employee.nama}:`, emailError);
-                }
+                res.json({
+                    success: true,
+                    message: `Test email sent with ${unevaluatedExpiringEmployees.length} unevaluated employees`,
+                    userId: testUserId,
+                    emailsSent: 1,
+                    totalUnevaluatedEmployees: unevaluatedExpiringEmployees.length,
+                    employees: sentEmployees,
+                });
+
+            } catch (emailError) {
+                console.error(`❌ Error sending test email:`, emailError);
+                res.status(500).json({
+                    success: false,
+                    error: String(emailError),
+                });
             }
-
-            res.json({
-                success: true,
-                message: `Test emails sent: ${emailsSent} emails for ${emailsSent} unevaluated employees`,
-                userId: testUserId,
-                emailsSent: emailsSent,
-                totalUnevaluatedEmployees: unevaluatedExpiringEmployees.length,
-                employees: sentEmployees,
-            });
 
         } catch (error) {
             console.error("Error:", error);
