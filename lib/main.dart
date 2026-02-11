@@ -9,6 +9,8 @@ import 'providers/prov_evaluation_upload.dart';
 import 'screens/layar_login.dart';
 import 'screens/layar_utama.dart';
 import 'theme/tema.dart';
+import 'services/connectivity_service.dart';
+import 'widgets/offline_overlay.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -20,16 +22,17 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Enable offline persistence
+  // Mencegah force close di Windows akibat file cache korup
+  // Dengan mematikan persistence, Firebase hanya akan menggunakan memori (RAM)
   try {
     FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true, 
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED
+      persistenceEnabled: false, 
     );
+    // Bersihkan sisa-sisa cache lama agar folder firestore di komputer bersih
+    await FirebaseFirestore.instance.clearPersistence();
   } catch (e) {
-    debugPrint("Firestore persistence error: $e");
+    debugPrint("Firestore settings error: $e");
   }
-
   runApp(const MyApp());
 }
 
@@ -45,6 +48,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => EvaluasiProvider()),
         ChangeNotifierProvider(create: (_) => PkwtProvider()),
         ChangeNotifierProvider(create: (_) => EvaluationUploadProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectivityService()),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {
@@ -62,6 +66,9 @@ class MyApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               theme: AppTheme.lightTheme,
               home: auth.isLoggedIn ? const MainScreen() : const LoginScreen(),
+              builder: (context, child) {
+                return OfflineOverlay(child: child!);
+              },
             ),
           );
         },
