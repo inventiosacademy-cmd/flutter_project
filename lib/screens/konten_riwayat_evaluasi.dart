@@ -494,24 +494,6 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
   }
 
   Widget _buildEvaluasiRow(Evaluasi evaluasi, EvaluasiProvider provider) {
-    Color statusColor;
-    Color statusBgColor;
-
-    switch (evaluasi.status) {
-      case EvaluasiStatus.draft:
-        statusColor = const Color(0xFFF59E0B);
-        statusBgColor = const Color(0xFFFEF3C7);
-        break;
-      case EvaluasiStatus.belumTTD:
-        statusColor = const Color(0xFF8B5CF6);
-        statusBgColor = const Color(0xFFF3E8FF);
-        break;
-      case EvaluasiStatus.selesai:
-        statusColor = const Color(0xFF22C55E);
-        statusBgColor = const Color(0xFFD1FAE5);
-        break;
-    }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
