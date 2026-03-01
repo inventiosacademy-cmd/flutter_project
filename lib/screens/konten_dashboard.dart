@@ -998,7 +998,6 @@ class _DashboardContentState extends State<DashboardContent> {
                                 ],
                               ),
                             ),
-<<<<<<< HEAD
                           PopupMenuItem(
                             value: 'email',
                             child: Row(
@@ -1009,10 +1008,7 @@ class _DashboardContentState extends State<DashboardContent> {
                               ],
                             ),
                           ),
-=======
                           ],
-
->>>>>>> 7dc8b004eb467175a265be8c5117a2bfdc5bed75
                           const PopupMenuDivider(height: 1),
                           PopupMenuItem(
                             value: 'delete',
