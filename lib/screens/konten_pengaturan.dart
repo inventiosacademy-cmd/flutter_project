@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../providers/prov_auth.dart' as app_auth;
 import '../theme/warna.dart';
@@ -181,13 +179,6 @@ class _SettingsContentState extends State<SettingsContent> {
             title: "Pengaturan Email Notifikasi",
             subtitle: "Atur email untuk reminder PKWT segera berakhir",
             onTap: () => _showEmailNotificationSettings(context),
-          ),
-          const Divider(height: 1, indent: 64, color: Color(0xFFF1F5F9)),
-          _buildActionItem(
-            icon: Icons.send_outlined,
-            title: "Test Kirim Email",
-            subtitle: "Kirim email test untuk verifikasi pengaturan",
-            onTap: () => _testSendEmail(context),
           ),
           
           _buildSectionHeader("Informasi Aplikasi"),
@@ -653,168 +644,5 @@ class _SettingsContentState extends State<SettingsContent> {
     );
   }
 
-  void _testSendEmail(BuildContext context) async {
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.send_outlined, color: AppColors.primaryBlue),
-            SizedBox(width: 12),
-            Text("Test Kirim Email"),
-          ],
-        ),
-        content: const Text(
-          "Ini akan mengirim email test ke alamat yang sudah dikonfigurasi. "
-          "Pastikan pengaturan email sudah benar.\n\n"
-          "Lanjutkan?",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Kirim Test"),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !context.mounted) return;
-
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text("Mengirim email test..."),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw "Sesi login tidak valid. Silakan login kembali.";
-      
-      final uid = user.uid;
-      debugPrint("DEBUG: Test email verification for user $uid");
-
-      // 1. Check Global Settings
-      late DocumentSnapshot globalSettings;
-      try {
-        globalSettings = await FirebaseFirestore.instance
-            .collection('app_settings')
-            .doc('notifications')
-            .get();
-        debugPrint("DEBUG: Global settings check OK");
-      } catch (e) {
-        debugPrint("DEBUG: Global settings check FAILED: $e");
-        throw "Gagal membaca pengirim (Global): $e";
-      }
-      
-      // 2. Check User Settings
-      late DocumentSnapshot userSettings;
-      try {
-        userSettings = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('settings')
-            .doc('notifications')
-            .get();
-        debugPrint("DEBUG: User settings check OK");
-      } catch (e) {
-        debugPrint("DEBUG: User settings check FAILED: $e");
-        throw "Gagal membaca penerima (Individu): $e";
-      }
-
-      if (!globalSettings.exists) {
-        if (context.mounted) {
-          Navigator.pop(context); // Close loading
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Pengaturan email belum dikonfigurasi. Silakan atur terlebih dahulu."),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-
-      // 3. Call the test function Securely
-      // Menggunakan POST dengan Authentication Header, bukan GET parameter
-      const functionUrl = "https://asia-southeast2-hr-bagong.cloudfunctions.net/testEmailNotification";
-      
-      final idToken = await user.getIdToken();
-      if (idToken == null) throw "Gagal mendapatkan token otentikasi.";
-
-      final response = await http.post(
-        Uri.parse(functionUrl),
-        headers: {
-          "Authorization": "Bearer $idToken",
-          "Content-Type": "application/json",
-        },
-        body: json.encode({
-          "userId": uid,
-          "testMode": true,
-        }),
-      );
-      
-      if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['success'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text("✅ ${data['message'] ?? 'Email berhasil dikirim'}"),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text("⚠️ Gagal mengirim email test."),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-        } else {
-          // SANITIZED ERROR: Jangan tampilkan raw error code ke user
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("❌ Terjadi kesalahan pada server."),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint("TEST EMAIL ERROR: $e"); // Log error detail only for developer
-      if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Gagal mengirim permintaan. Cek koneksi internet Anda."),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 }
 

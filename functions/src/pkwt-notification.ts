@@ -181,7 +181,7 @@ async function isEmployeeEvaluated(db: admin.firestore.Firestore, userId: string
  */
 export const sendPkwtExpirationNotification = onSchedule(
     {
-        schedule: "0 1 * * *", // Setiap hari jam 01:00 UTC = 08:00 WIB
+        schedule: "0 8 * * *", // Setiap hari jam 08:00 WIB (Asia/Jakarta)
         timeZone: "Asia/Jakarta",
         region: "asia-southeast2", // Region Indonesia
     },
@@ -554,12 +554,22 @@ export const testEmailNotification = onRequest(
             try {
                 const emailHtml = createEmailTemplate(unevaluatedExpiringEmployees);
 
-                await transporter.sendMail({
+                // Get CC from request body (if sent from manual action in app)
+                const ccEmail = req.body.cc as string || "";
+
+                const mailPayload: nodemailer.SendMailOptions = {
                     from: `"HR Dashboard" <${emailPengirim}>`,
                     to: emailPenerima,
-                    subject: `🧪 [TEST] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
+                    subject: `⚠️ [HR Dashboard] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
                     html: emailHtml,
-                });
+                };
+
+                if (ccEmail) {
+                    mailPayload.cc = ccEmail;
+                    console.log(`📋 Adding CC: ${ccEmail}`);
+                }
+
+                await transporter.sendMail(mailPayload);
 
                 const sentEmployees = unevaluatedExpiringEmployees.map(e => ({
                     nama: e.nama,

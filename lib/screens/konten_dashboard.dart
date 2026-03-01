@@ -1,4 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/prov_karyawan.dart';
@@ -882,6 +886,8 @@ class _DashboardContentState extends State<DashboardContent> {
                             widget.onEvaluasi?.call(emp);
                           } else if (value == 'edit') {
                             widget.onEdit?.call(emp);
+                          } else if (value == 'email') {
+                            _sendEmailToEmployee(context, emp);
                           } else if (value == 'delete') {
                             showDialog(
                               context: context,
@@ -959,6 +965,16 @@ class _DashboardContentState extends State<DashboardContent> {
                                 ],
                               ),
                             ),
+                          PopupMenuItem(
+                            value: 'email',
+                            child: Row(
+                              children: [
+                                Icon(Icons.email_outlined, size: 18, color: Colors.grey.shade700),
+                                const SizedBox(width: 12),
+                                Text('Kirim Email', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
                           const PopupMenuDivider(height: 1),
                           PopupMenuItem(
                             value: 'delete',
@@ -992,5 +1008,252 @@ class _DashboardContentState extends State<DashboardContent> {
       const Color(0xFFEF4444),
     ];
     return colors[index % colors.length];
+  }
+
+  void _sendEmailToEmployee(BuildContext context, dynamic emp) async {
+    final ccController = TextEditingController();
+
+    // Show dialog with email field
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.email_outlined, color: AppColors.primaryBlue, size: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Kirim Email Notifikasi",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                          ),
+                          Text(
+                            emp.nama,
+                            style: const TextStyle(fontSize: 13, color: AppColors.primaryBlue, fontWeight: FontWeight.w500),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                const SizedBox(height: 24),
+
+                // Email field
+                const Text(
+                  "Tujuan Email",
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: ccController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: "contoh@email.com",
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    prefixIcon: const Icon(Icons.alternate_email, color: AppColors.primaryBlue),
+                    helperText: "Email yang akan menerima notifikasi pengingat PKWT",
+                    helperStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+
+                const SizedBox(height: 28),
+
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        child: const Text("Batal", style: TextStyle(color: Color(0xFF64748B))),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.send_rounded, size: 18),
+                        label: const Text("Kirim Email"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text("Mengirim email..."),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw "Silakan login ulang untuk melanjutkan.";
+
+      final uid = user.uid;
+      final idToken = await user.getIdToken();
+      if (idToken == null) throw "Tidak dapat memverifikasi sesi Anda. Silakan login ulang.";
+
+      // Check Global Settings
+      final globalSettings = await FirebaseFirestore.instance
+          .collection('app_settings')
+          .doc('notifications')
+          .get();
+
+      if (!globalSettings.exists) {
+        if (context.mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Pengaturan notifikasi email belum diatur. Silakan hubungi administrator."),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      final emailTujuan = ccController.text.trim();
+      if (emailTujuan.isEmpty) {
+        if (context.mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Masukkan alamat email tujuan terlebih dahulu."),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      const functionUrl = "https://asia-southeast2-hr-bagong.cloudfunctions.net/testEmailNotification";
+
+      final body = <String, dynamic>{
+        "userId": uid,
+        "testMode": true,
+        "employeeId": emp.id,
+        "cc": emailTujuan,
+      };
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          "Authorization": "Bearer $idToken",
+          "Content-Type": "application/json",
+        },
+        body: json.encode(body),
+      );
+
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['success'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Email berhasil dikirim ke ${ccController.text.trim()}"),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Email gagal terkirim. Pastikan alamat email penerima sudah benar."),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Email tidak dapat dikirim saat ini. Silakan coba beberapa saat lagi."),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("SEND EMAIL ERROR: $e");
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Pengiriman email gagal. Pastikan perangkat Anda terhubung ke internet dan coba lagi."),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 }
