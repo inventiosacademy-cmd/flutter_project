@@ -205,6 +205,7 @@ class EvaluasiProvider with ChangeNotifier {
   List<Evaluasi> getFilteredEvaluasi({
     String? timeFilter, // 'all', 'thisMonth', '3months', '6months', 'thisYear'
     EvaluasiStatus? statusFilter,
+    String? divisiFilter,
     String? searchQuery,
   }) {
     var filtered = [..._evaluasiList];
@@ -234,6 +235,11 @@ class EvaluasiProvider with ChangeNotifier {
     // Filter by status
     if (statusFilter != null) {
       filtered = filtered.where((e) => e.status == statusFilter).toList();
+    }
+
+    // Filter by divisi/departemen
+    if (divisiFilter != null && divisiFilter.isNotEmpty) {
+      filtered = filtered.where((e) => e.employeeDepartemen == divisiFilter).toList();
     }
 
     // Filter by search query

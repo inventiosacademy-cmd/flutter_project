@@ -39,6 +39,15 @@ service cloud.firestore {
           // NO DELETE - sesuai requirement keamanan data
           allow delete: if false;
         }
+
+        // --- EVALUATION UPLOADS SUBCOLLECTION ---
+        // Menyimpan metadata dokumen evaluasi manual yang di-upload
+        // Ref: lib/providers/prov_evaluation_upload.dart
+        match /evaluation_uploads/{docId} {
+          allow read, create: if isOwner(userId);
+          allow update: if false;
+          allow delete: if false;
+        }
       }
       
       // --- EVALUASI SUBCOLLECTION ---
