@@ -33,6 +33,22 @@ service firebase.storage {
       allow delete: if false;
     }
     
+    // Evaluation Uploads Storage
+    match /users/{userId}/employees/{employeeId}/evaluations/{fileName} {
+      // Allow read untuk owner
+      allow read: if isOwner(userId);
+      
+      // Allow upload (create) untuk owner dengan validasi PDF
+      allow create: if isOwner(userId) 
+        && isValidPdf();
+      
+      // NO UPDATE - file tidak bisa diupdate, hanya create baru
+      allow update: if false;
+      
+      // NO DELETE
+      allow delete: if false;
+    }
+    
     // Block semua akses lain
     match /{allPaths=**} {
       allow read, write: if false;

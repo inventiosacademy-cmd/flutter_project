@@ -8,6 +8,7 @@ import '../utils/error_helper.dart';
 class EvaluationUploadProvider with ChangeNotifier {
   final Map<String, List<EvaluationUpload>> _evaluationUploads = {};
   final Map<String, StreamSubscription?> _subscriptions = {};
+  StreamSubscription? _globalSubscription;
   bool _isLoading = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -18,6 +19,49 @@ class EvaluationUploadProvider with ChangeNotifier {
   List<EvaluationUpload> getEvaluationsByEmployee(String employeeId) {
     return _evaluationUploads[employeeId] ?? [];
   }
+
+  /// Check whether a manual evaluation upload exists for a given employee + pkwtKe.
+  /// Used by the dashboard to determine "sudah evaluasi" status.
+  bool hasEvaluationUpload(String employeeId, int pkwtKe) {
+    return (_evaluationUploads[employeeId] ?? [])
+        .any((u) => u.pkwtKe == pkwtKe);
+  }
+
+  /// Start a global realtime listener across ALL employees using a collectionGroup query.
+  /// This allows the dashboard to reactively know upload status for every employee.
+  void initGlobalListener() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    _globalSubscription?.cancel();
+
+    // Listen to the employees collection for this user.
+    // For each employee found, initialise a per-employee evaluation_uploads
+    // listener (which uses the specific path already allowed by Firestore rules).
+    _globalSubscription = _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('employees')
+        .snapshots()
+        .listen((snapshot) {
+      for (final doc in snapshot.docs) {
+        final empId = doc.id;
+        // Only create a listener if one doesn't already exist
+        if (!_subscriptions.containsKey(empId)) {
+          initEvaluationListener(empId);
+        }
+      }
+    }, onError: (e) {
+      debugPrint('EvaluationUploadProvider: global listener error: $e');
+    });
+  }
+
+  /// Stop global listener
+  void cancelGlobalListener() {
+    _globalSubscription?.cancel();
+    _globalSubscription = null;
+  }
+
 
   /// Initialize realtime listener for employee's evaluation uploads
   void initEvaluationListener(String employeeId) {
@@ -89,6 +133,7 @@ class EvaluationUploadProvider with ChangeNotifier {
   @override
   void dispose() {
     // Cancel all subscriptions
+    _globalSubscription?.cancel();
     for (var subscription in _subscriptions.values) {
       subscription?.cancel();
     }

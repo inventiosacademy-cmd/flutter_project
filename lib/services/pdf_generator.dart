@@ -973,4 +973,31 @@ class EvaluasiPdfGenerator {
     final pdfData = await generatePdf(data);
     await Printing.sharePdf(bytes: pdfData, filename: filename);
   }
+
+  /// Generate a blank/template evaluation PDF pre-filled with employee name & position.
+  /// All evaluation fields (ratings, comments, rekomendasi, TTD) are left empty.
+  static Future<Uint8List> generateBlankPdf(Employee employee) async {
+    final blankData = EvaluasiData(
+      namaKaryawan: employee.nama,
+      posisi: employee.posisi,
+      departemen: employee.departemen,
+      lokasiKerja: employee.departemen,
+      atasanLangsung: employee.atasanLangsung,
+      tanggalMasuk: employee.tglMasuk,
+      tanggalPkwtBerakhir: employee.tglPkwtBerakhir,
+      pkwtKe: employee.pkwtKe,
+      tanggalEvaluasi: DateTime.now(),
+      sakit: 0,
+      izin: 0,
+      terlambat: 0,
+      mangkir: 0,
+      ratings: {},
+      comments: {},
+      recommendation: 'perpanjang',
+      perpanjangBulan: 0,
+      catatan: '',
+      namaEvaluator: '',
+    );
+    return generatePdf(blankData);
+  }
 }

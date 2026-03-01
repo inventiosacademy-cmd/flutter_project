@@ -23,7 +23,7 @@ class KontenRiwayatEvaluasi extends StatefulWidget {
 
 class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
   String _selectedTimeFilter = 'all';
-  EvaluasiStatus? _selectedStatusFilter;
+  String? _selectedDivisiFilter;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   
@@ -194,7 +194,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                       const SizedBox(width: 16),
                       _buildTimeFilterDropdown(),
                       const SizedBox(width: 12),
-                      _buildStatusFilterDropdown(),
+                      _buildDivisiFilterDropdown(),
                     ],
                   ),
 
@@ -212,7 +212,6 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                         _buildTableHeader("KARYAWAN", flex: 2),
                         _buildTableHeader("TANGGAL", flex: 1),
                         _buildTableHeader("PKWT KE", center: true),
-                        _buildTableHeader("STATUS", flex: 1, center: true),
                         _buildTableHeader("AKSI", flex: 1, center: true),
                       ],
                     ),
@@ -223,7 +222,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                     builder: (context, provider, _) {
                       final allEvaluasi = provider.getFilteredEvaluasi(
                         timeFilter: _selectedTimeFilter,
-                        statusFilter: _selectedStatusFilter,
+                        divisiFilter: _selectedDivisiFilter,
                         searchQuery: _searchQuery,
                       );
                       final totalData = provider.evaluasiList.length;
@@ -433,36 +432,48 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
     );
   }
 
-  Widget _buildStatusFilterDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text("Status: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<EvaluasiStatus?>(
-              value: _selectedStatusFilter,
-              icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Semua')),
-                ...EvaluasiStatus.values.map((status) {
-                  return DropdownMenuItem(
-                    value: status,
-                    child: Text(status.label),
-                  );
-                }),
-              ],
-              onChanged: (value) => setState(() => _selectedStatusFilter = value),
-            ),
+  Widget _buildDivisiFilterDropdown() {
+    return Consumer<EvaluasiProvider>(
+      builder: (context, provider, _) {
+        // Build unique divisi list from evaluasi data
+        final divisiSet = provider.evaluasiList
+            .map((e) => e.employeeDepartemen)
+            .where((d) => d.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(10),
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Divisi: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _selectedDivisiFilter,
+                  icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('Semua')),
+                    ...divisiSet.map((divisi) =>
+                      DropdownMenuItem<String?>(value: divisi, child: Text(divisi)),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() {
+                    _selectedDivisiFilter = value;
+                    _currentPage = 1;
+                  }),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -483,24 +494,6 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
   }
 
   Widget _buildEvaluasiRow(Evaluasi evaluasi, EvaluasiProvider provider) {
-    Color statusColor;
-    Color statusBgColor;
-
-    switch (evaluasi.status) {
-      case EvaluasiStatus.draft:
-        statusColor = const Color(0xFFF59E0B);
-        statusBgColor = const Color(0xFFFEF3C7);
-        break;
-      case EvaluasiStatus.belumTTD:
-        statusColor = const Color(0xFF8B5CF6);
-        statusBgColor = const Color(0xFFF3E8FF);
-        break;
-      case EvaluasiStatus.selesai:
-        statusColor = const Color(0xFF22C55E);
-        statusBgColor = const Color(0xFFD1FAE5);
-        break;
-    }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -561,32 +554,6 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
             ),
           ),
 
-          // Status
-          Expanded(
-            flex: 1,
-            child: Center(
-              child: Tooltip(
-                message: evaluasi.status.label,
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 70),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusBgColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    _getShortStatusLabel(evaluasi.status),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
           // Actions
           Expanded(
             flex: 1,

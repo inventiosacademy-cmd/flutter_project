@@ -7,8 +7,10 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/prov_karyawan.dart';
 import '../providers/prov_evaluasi.dart';
+import '../providers/prov_evaluation_upload.dart';
 import '../models/karyawan.dart';
 import '../theme/warna.dart';
+import '../widgets/manual_evaluation_dialog.dart';
 
 class DashboardContent extends StatefulWidget {
   final VoidCallback? onTambahKaryawan;
@@ -53,6 +55,18 @@ class _DashboardContentState extends State<DashboardContent> {
       return fullName;
     }
     return '${words[0]} ${words[1]}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Start global listener so dashboard can see manual evaluation uploads reactively
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<EvaluationUploadProvider>(context, listen: false)
+            .initGlobalListener();
+      }
+    });
   }
 
   @override
@@ -275,12 +289,15 @@ class _DashboardContentState extends State<DashboardContent> {
 
                       // Filter by evaluation
                       if (_selectedEvaluasi != 'Semua') {
+                        final uploadProvider = Provider.of<EvaluationUploadProvider>(context, listen: false);
                         employees = employees.where((e) {
-                          // Check evaluation for CURRENT PKWT Ke only
-                          final hasEvaluation = evaluasiProvider
+                          // Check evaluation for CURRENT PKWT Ke — both system AND manual uploads
+                          final hasSistemEval = evaluasiProvider
                               .getEvaluasiByEmployee(e.id)
                               .where((eval) => eval.pkwtKe == e.pkwtKe)
                               .isNotEmpty;
+                          final hasUploadEval = uploadProvider.hasEvaluationUpload(e.id, e.pkwtKe);
+                          final hasEvaluation = hasSistemEval || hasUploadEval;
                           final daysLeft = e.hariMenujuExpired;
                           
                           if (_selectedEvaluasi == 'Sudah Evaluasi') {
@@ -778,13 +795,15 @@ class _DashboardContentState extends State<DashboardContent> {
           ),
           // Evaluasi
           Expanded(
-            child: Consumer<EvaluasiProvider>(
-              builder: (context, evaluasiProvider, _) {
-                // Check if employee has evaluation for CURRENT PKWT Ke
-                final hasEvaluation = evaluasiProvider
+            child: Consumer2<EvaluasiProvider, EvaluationUploadProvider>(
+              builder: (context, evaluasiProvider, uploadProvider, _) {
+                // Check if employee has evaluation (sistem OR manual upload) for CURRENT PKWT Ke
+                final hasSistemEval = evaluasiProvider
                     .getEvaluasiByEmployee(emp.id)
                     .where((e) => e.pkwtKe == emp.pkwtKe)
                     .isNotEmpty;
+                final hasEvaluation = hasSistemEval ||
+                    uploadProvider.hasEvaluationUpload(emp.id, emp.pkwtKe);
                 
                 // Jika expired, tidak perlu evaluasi - tampilkan '-'
                 if (daysLeft <= 0) {
@@ -842,13 +861,15 @@ class _DashboardContentState extends State<DashboardContent> {
           // Actions
           Expanded(
             flex: 1,
-            child: Consumer<EvaluasiProvider>(
-              builder: (context, evaluasiProvider, _) {
-                // Check if employee has evaluation for CURRENT PKWT Ke
-                final hasEvaluation = evaluasiProvider
+            child: Consumer2<EvaluasiProvider, EvaluationUploadProvider>(
+              builder: (context, evaluasiProvider, uploadProvider, _) {
+                // Check if employee has evaluation (sistem OR manual upload) for CURRENT PKWT Ke
+                final hasSistemEval = evaluasiProvider
                     .getEvaluasiByEmployee(emp.id)
                     .where((e) => e.pkwtKe == emp.pkwtKe)
                     .isNotEmpty;
+                final hasEvaluation = hasSistemEval ||
+                    uploadProvider.hasEvaluationUpload(emp.id, emp.pkwtKe);
                 
                 // Tentukan apakah tombol evaluasi perlu ditampilkan
                 // Sembunyikan jika: expired (daysLeft <= 0) ATAU sudah evaluasi
@@ -882,8 +903,10 @@ class _DashboardContentState extends State<DashboardContent> {
                         onSelected: (value) {
                           if (value == 'detail') {
                             widget.onViewDetail?.call(emp);
-                          } else if (value == 'evaluate') {
+                          } else if (value == 'evaluate_sistem') {
                             widget.onEvaluasi?.call(emp);
+                          } else if (value == 'evaluate_manual') {
+                            ManualEvaluationDialog.show(context, emp);
                           } else if (value == 'edit') {
                             widget.onEdit?.call(emp);
                           } else if (value == 'email') {
@@ -954,17 +977,28 @@ class _DashboardContentState extends State<DashboardContent> {
                             ),
                           ),
                           // Hanya tampilkan tombol Evaluasi jika belum expired dan belum evaluasi
-                          if (showEvaluateButton)
+                          if (showEvaluateButton) ...[
                             PopupMenuItem(
-                              value: 'evaluate',
+                              value: 'evaluate_manual',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.download_for_offline_outlined, size: 18, color: const Color(0xFF0EA5E9)),
+                                  const SizedBox(width: 12),
+                                  Text('Evaluasi Manual', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'evaluate_sistem',
                               child: Row(
                                 children: [
                                   Icon(Icons.assignment_turned_in_outlined, size: 18, color: Colors.grey.shade700),
                                   const SizedBox(width: 12),
-                                  Text('Evaluasi', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
+                                  Text('Evaluasi Sistem', style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w500)),
                                 ],
                               ),
                             ),
+<<<<<<< HEAD
                           PopupMenuItem(
                             value: 'email',
                             child: Row(
@@ -975,6 +1009,10 @@ class _DashboardContentState extends State<DashboardContent> {
                               ],
                             ),
                           ),
+=======
+                          ],
+
+>>>>>>> 7dc8b004eb467175a265be8c5117a2bfdc5bed75
                           const PopupMenuDivider(height: 1),
                           PopupMenuItem(
                             value: 'delete',
