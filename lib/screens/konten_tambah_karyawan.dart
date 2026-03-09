@@ -64,6 +64,10 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     if (e != null) {
       _departemen = e.departemen;
       _originalPkwtKe = e.pkwtKe;
+      // Guard: if employee's departemen is not in the list, add it
+      if (_departemen.isNotEmpty && !_departemenList.contains(_departemen)) {
+        _departemenList.add(_departemen);
+      }
     }
 
     // Pre-populate first PKWT entry with existing data if editing
@@ -83,6 +87,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     'OPERASIONAL',
     'PLANT',
     'TDC',
+    'IT',
   ];
 
   void _submit() async {

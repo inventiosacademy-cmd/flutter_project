@@ -31,25 +31,28 @@ class KontenDetailKaryawan extends StatefulWidget {
 class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
   int _selectedTab = 0; // 0 = Personal Profile, 1 = Evaluasi, 2 = PKWT
 
+  // Store provider refs so we can safely call them in dispose()
+  PkwtProvider? _pkwtProvider;
+  EvaluationUploadProvider? _evalUploadProvider;
+
   @override
   void initState() {
     super.initState();
     // Initialize PKWT and Evaluation listeners when page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<PkwtProvider>(context, listen: false)
-          .initPkwtListener(widget.employee.id);
-      Provider.of<EvaluationUploadProvider>(context, listen: false)
-          .initEvaluationListener(widget.employee.id);
+      if (!mounted) return;
+      _pkwtProvider = Provider.of<PkwtProvider>(context, listen: false);
+      _evalUploadProvider = Provider.of<EvaluationUploadProvider>(context, listen: false);
+      _pkwtProvider!.initPkwtListener(widget.employee.id);
+      _evalUploadProvider!.initEvaluationListener(widget.employee.id);
     });
   }
 
   @override
   void dispose() {
-    // Cancel PKWT and Evaluation listeners when leaving page
-    Provider.of<PkwtProvider>(context, listen: false)
-        .cancelListener(widget.employee.id);
-    Provider.of<EvaluationUploadProvider>(context, listen: false)
-        .cancelListener(widget.employee.id);
+    // Use stored refs — safe to call after widget is deactivated
+    _pkwtProvider?.cancelListener(widget.employee.id);
+    _evalUploadProvider?.cancelListener(widget.employee.id);
     super.dispose();
   }
 

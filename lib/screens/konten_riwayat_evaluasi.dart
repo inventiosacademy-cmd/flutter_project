@@ -433,6 +433,8 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
     required IconData icon,
     required String label,
     required String value,
+    Color? iconBgColor,
+    Color? iconColor,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -453,10 +455,10 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFE0F2FE), // Light sky blue
+              color: iconBgColor ?? const Color(0xFFE0F2FE),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: const Color(0xFF0EA5E9), size: 20), // Primary blue
+            child: Icon(icon, color: iconColor ?? const Color(0xFF0EA5E9), size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -518,13 +520,21 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
   Widget _buildDivisiFilterDropdown() {
     return Consumer<EvaluasiProvider>(
       builder: (context, provider, _) {
-        // Build unique divisi list from evaluasi data
+        // Build unique divisi list from evaluasi data — trim to avoid whitespace dupes
         final divisiSet = provider.evaluasiList
-            .map((e) => e.employeeDepartemen)
+            .map((e) => e.employeeDepartemen.trim())
             .where((d) => d.isNotEmpty)
             .toSet()
             .toList()
           ..sort();
+
+        // Guard: if current value is no longer in the list, reset to null
+        if (_selectedDivisiFilter != null &&
+            !divisiSet.contains(_selectedDivisiFilter)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _selectedDivisiFilter = null);
+          });
+        }
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -538,7 +548,10 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
               Text("Divisi: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
-                  value: _selectedDivisiFilter,
+                  value: (_selectedDivisiFilter != null &&
+                          divisiSet.contains(_selectedDivisiFilter))
+                      ? _selectedDivisiFilter
+                      : null,
                   icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                   items: [
