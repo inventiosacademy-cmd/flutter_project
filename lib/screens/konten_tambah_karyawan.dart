@@ -19,21 +19,37 @@ class KontenTambahKaryawan extends StatefulWidget {
   State<KontenTambahKaryawan> createState() => _KontenTambahKaryawanState();
 }
 
+/// Helper class to hold one PKWT entry
+class _PkwtEntry {
+  int pkwtKe;
+  DateTime? tglMasuk;
+  DateTime? tglBerakhir;
+  PlatformFile? file;
+  final TextEditingController pkwtKeController;
+
+  _PkwtEntry({
+    required this.pkwtKe,
+    this.tglMasuk,
+    this.tglBerakhir,
+    this.file,
+  }) : pkwtKeController = TextEditingController(text: pkwtKe.toString());
+
+  void dispose() => pkwtKeController.dispose();
+  int get currentKe => int.tryParse(pkwtKeController.text) ?? pkwtKe;
+}
+
 class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
   final _formKey = GlobalKey<FormState>();
-  
+
   late TextEditingController _namaController;
   late TextEditingController _posisiController;
   late TextEditingController _atasanController;
-  late TextEditingController _pkwtKeController;
-  
+
   String _departemen = 'HCGS';
-  DateTime? _tglMasuk;
-  DateTime? _tglPkwtBerakhir;
   bool _isLoading = false;
-  
-  // PKWT Upload
-  PlatformFile? _selectedPkwtFile;
+
+  // PKWT Upload — list of entries (each entry = pkwtKe + dates + PDF)
+  List<_PkwtEntry> _pkwtEntries = [];
   bool _uploadingPkwt = false;
   int? _originalPkwtKe; // Track original PKWT Ke to detect changes
 
@@ -44,14 +60,20 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     _namaController = TextEditingController(text: e?.nama ?? '');
     _posisiController = TextEditingController(text: e?.posisi ?? '');
     _atasanController = TextEditingController(text: e?.atasanLangsung ?? '');
-    _pkwtKeController = TextEditingController(text: e?.pkwtKe.toString() ?? '1');
-    
+
     if (e != null) {
       _departemen = e.departemen;
-      _tglMasuk = e.tglMasuk;
-      _tglPkwtBerakhir = e.tglPkwtBerakhir;
-      _originalPkwtKe = e.pkwtKe; // Store original value
+      _originalPkwtKe = e.pkwtKe;
     }
+
+    // Pre-populate first PKWT entry with existing data if editing
+    _pkwtEntries = [
+      _PkwtEntry(
+        pkwtKe: e?.pkwtKe ?? 1,
+        tglMasuk: e?.tglMasuk,
+        tglBerakhir: e?.tglPkwtBerakhir,
+      ),
+    ];
   }
 
   final List<String> _departemenList = [
@@ -65,43 +87,45 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
 
   void _submit() async {
     if (_formKey.currentState!.validate()) {
-      if (_tglMasuk == null || _tglPkwtBerakhir == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.warning_rounded, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Harap lengkapi semua tanggal'),
-              ],
+      // Validate: every entry must have both dates
+      for (int i = 0; i < _pkwtEntries.length; i++) {
+        final entry = _pkwtEntries[i];
+        if (entry.tglMasuk == null || entry.tglBerakhir == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.warning_rounded, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Text('PKWT Ke-${entry.pkwtKe}: harap lengkapi semua tanggal'),
+                ],
+              ),
+              backgroundColor: AppColors.warning,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            backgroundColor: AppColors.warning,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-        return;
+          );
+          return;
+        }
       }
 
       // Validate PKWT upload based on mode
-      final currentPkwtKe = int.tryParse(_pkwtKeController.text) ?? 1;
       final isAddMode = widget.employeeToEdit == null;
+      final currentPkwtKe = _pkwtEntries.first.currentKe;
       final isPkwtKeChanged = !isAddMode && (_originalPkwtKe != currentPkwtKe);
-      
+
       if (isAddMode || isPkwtKeChanged) {
-        // PKWT upload is mandatory for:
-        // 1. Add mode (new employee)
-        // 2. Edit mode with changed PKWT Ke
-        if (_selectedPkwtFile == null) {
+        final hasAnyFile = _pkwtEntries.any((e) => e.file != null);
+        if (!hasAnyFile) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Row(
                 children: [
                   const Icon(Icons.error_outline, color: Colors.white),
                   const SizedBox(width: 12),
-                  Text(isAddMode 
-                    ? 'Dokumen PKWT wajib diupload' 
-                    : 'Upload dokumen PKWT baru karena PKWT Ke berubah'),
+                  Text(isAddMode
+                      ? 'Dokumen PKWT wajib diupload'
+                      : 'Upload dokumen PKWT baru karena PKWT Ke berubah'),
                 ],
               ),
               backgroundColor: AppColors.error,
@@ -116,15 +140,17 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
       setState(() => _isLoading = true);
       await Future.delayed(const Duration(milliseconds: 500));
 
+      // Use the FIRST entry's dates as the Employee's primary contract dates
+      final firstEntry = _pkwtEntries.first;
       final newEmployee = Employee(
-        id: widget.employeeToEdit?.id ?? const Uuid().v4(), // Use existing ID if editing
+        id: widget.employeeToEdit?.id ?? const Uuid().v4(),
         nama: _namaController.text,
         posisi: _posisiController.text,
         departemen: _departemen,
         atasanLangsung: _atasanController.text,
-        tglMasuk: _tglMasuk!,
-        tglPkwtBerakhir: _tglPkwtBerakhir!,
-        pkwtKe: int.tryParse(_pkwtKeController.text) ?? 1,
+        tglMasuk: firstEntry.tglMasuk!,
+        tglPkwtBerakhir: firstEntry.tglBerakhir!,
+        pkwtKe: firstEntry.currentKe,
       );
 
       if (mounted) {
@@ -135,25 +161,23 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
           } else {
             await provider.addEmployee(newEmployee);
           }
-          
-          // Upload PKWT file if selected
-          if (_selectedPkwtFile != null && mounted) {
+
+          // Upload all PKWT files that have a file selected
+          final entriesWithFile = _pkwtEntries.where((e) => e.file != null).toList();
+          if (entriesWithFile.isNotEmpty && mounted) {
             setState(() => _uploadingPkwt = true);
             try {
-              final pkwtKe = int.parse(_pkwtKeController.text);
               final uploadService = PkwtUploadService();
-              
-              // Upload to Firebase Storage
-              final pkwtDocument = await uploadService.uploadPkwtPdf(
-                employeeId: newEmployee.id,
-                pdfFile: _selectedPkwtFile!,
-                pkwtKe: pkwtKe,
-              );
-
-              // Save metadata to Firestore
-              if (mounted) {
-                await Provider.of<PkwtProvider>(context, listen: false)
-                    .addPkwtDocument(pkwtDocument);
+              for (final entry in entriesWithFile) {
+                final pkwtDocument = await uploadService.uploadPkwtPdf(
+                  employeeId: newEmployee.id,
+                  pdfFile: entry.file!,
+                  pkwtKe: entry.pkwtKe,
+                );
+                if (mounted) {
+                  await Provider.of<PkwtProvider>(context, listen: false)
+                      .addPkwtDocument(pkwtDocument);
+                }
               }
             } catch (e) {
               if (mounted) {
@@ -167,12 +191,10 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                 );
               }
             } finally {
-              if (mounted) {
-                setState(() => _uploadingPkwt = false);
-              }
+              if (mounted) setState(() => _uploadingPkwt = false);
             }
           }
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -180,7 +202,9 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                   children: [
                     const Icon(Icons.check_circle_rounded, color: Colors.white),
                     const SizedBox(width: 12),
-                    Text(widget.employeeToEdit != null ? 'Data berhasil diperbarui' : 'Data karyawan berhasil disimpan'),
+                    Text(widget.employeeToEdit != null
+                        ? 'Data berhasil diperbarui'
+                        : 'Data karyawan berhasil disimpan'),
                   ],
                 ),
                 backgroundColor: AppColors.success,
@@ -188,12 +212,11 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             );
-            
             widget.onBack();
           }
         } catch (e) {
-           if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Gagal menyimpan data: $e'),
                 backgroundColor: AppColors.error,
@@ -202,7 +225,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
               ),
             );
             setState(() => _isLoading = false);
-           }
+          }
         }
       }
     }
@@ -512,7 +535,9 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     _namaController.dispose();
     _posisiController.dispose();
     _atasanController.dispose();
-    _pkwtKeController.dispose();
+    for (final e in _pkwtEntries) {
+      e.dispose();
+    }
     super.dispose();
   }
 
@@ -591,32 +616,8 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                   ),
                   
                   const SizedBox(height: 24),
-                  
-                  // Informasi Kontrak PKWT Section
-                  _buildSection(
-                    title: "Informasi Kontrak PKWT",
-                    icon: Icons.description_rounded,
-                    children: [
-                      _buildDateField('Tanggal Masuk Kerja', _tglMasuk, () => 
-                        _pickDate('Pilih Tanggal Masuk', _tglMasuk, (d) => _tglMasuk = d)),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: _buildDateField('Tanggal PKWT Berakhir', _tglPkwtBerakhir, () => 
-                              _pickDate('Pilih Tanggal PKWT Berakhir', _tglPkwtBerakhir, (d) => _tglPkwtBerakhir = d)),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildPkwtKeField()),
-                        ],
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Upload Dokumen PKWT Section (Optional)
+
+                  // Kontrak PKWT Section (tanggal + upload per entri)
                   _buildPkwtUploadSection(),
                   
                   const SizedBox(height: 32),
@@ -719,21 +720,6 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     );
   }
 
-  Widget _buildPkwtKeField() {
-    return TextFormField(
-      controller: _pkwtKeController,
-      keyboardType: TextInputType.number,
-      validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
-      decoration: InputDecoration(
-        labelText: 'PKWT Ke-',
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-      ),
-    );
-  }
-
   Widget _buildDateField(String label, DateTime? value, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -755,7 +741,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     );
   }
 
-  Future<void> _pickPkwtFile() async {
+  Future<void> _pickPkwtFileForEntry(int index) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -780,7 +766,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
         }
 
         setState(() {
-          _selectedPkwtFile = file;
+          _pkwtEntries[index].file = file;
         });
       }
     } catch (e) {
@@ -795,10 +781,28 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     }
   }
 
-  void _clearPkwtFile() {
+  void _clearPkwtFileForEntry(int index) {
     setState(() {
-      _selectedPkwtFile = null;
+      _pkwtEntries[index].file = null;
     });
+  }
+
+  void _addPkwtEntry() {
+    setState(() {
+      // Use stored pkwtKe int (not the text controller) to avoid stale-state crash
+      final nextKe = _pkwtEntries.isEmpty
+          ? 1
+          : _pkwtEntries.map((e) => e.pkwtKe).reduce((a, b) => a > b ? a : b) + 1;
+      _pkwtEntries.add(_PkwtEntry(pkwtKe: nextKe));
+    });
+  }
+
+  void _removePkwtEntry(int index) {
+    final entry = _pkwtEntries[index];
+    setState(() {
+      _pkwtEntries.removeAt(index);
+    });
+    entry.dispose();
   }
 
   Widget _buildPkwtUploadSection() {
@@ -812,6 +816,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Section Header ──────────────────────────────────────────
           Row(
             children: [
               Container(
@@ -820,122 +825,436 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                   color: AppColors.primaryBlue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.upload_file_rounded, color: AppColors.primaryBlue, size: 20),
+                child: Icon(Icons.description_rounded, color: AppColors.primaryBlue, size: 20),
               ),
               const SizedBox(width: 12),
               const Text(
-                'Upload Dokumen PKWT',
+                'Informasi Kontrak PKWT',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
               ),
               const SizedBox(width: 4),
-              const Text(
-                '*',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
-              ),
+              const Text('*', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            widget.employeeToEdit == null
-                ? 'Wajib upload dokumen PKWT untuk karyawan baru.'
-                : 'Upload dokumen PKWT baru jika PKWT Ke berubah.',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-          ),
           const SizedBox(height: 20),
-          
-          // File picker area
-          InkWell(
-            onTap: _isLoading || _uploadingPkwt ? null : _pickPkwtFile,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _selectedPkwtFile != null ? AppColors.primaryBlue : const Color(0xFFCBD5E1),
-                  width: 1.5,
-                  strokeAlign: BorderSide.strokeAlignInside,
-                ),
-                color: _selectedPkwtFile != null 
-                    ? AppColors.primaryBlue.withOpacity(0.02) 
-                    : const Color(0xFFF8FAFC),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+
+          // ── Entry list ──────────────────────────────────────────────
+          ..._pkwtEntries.asMap().entries.map((mapEntry) {
+            final idx = mapEntry.key;
+            final entry = mapEntry.value;
+            final hasFile = entry.file != null;
+            final isFirst = idx == 0;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Divider between entries
+                if (!isFirst) ...[
+                  const Divider(height: 32, thickness: 1, color: Color(0xFFF1F5F9)),
+                ],
+
+                // Remove button (only when >1 entry)
+                if (_pkwtEntries.length > 1)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: InkWell(
+                      onTap: _isLoading || _uploadingPkwt ? null : () => _removePkwtEntry(idx),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red.shade400),
+                            const SizedBox(width: 4),
+                            Text('Hapus', style: TextStyle(fontSize: 12, color: Colors.red.shade400)),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Icon(
-                      _selectedPkwtFile != null ? Icons.description : Icons.cloud_upload_outlined,
-                      size: 28,
-                      color: _selectedPkwtFile != null ? AppColors.primaryBlue : const Color(0xFF64748B),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _selectedPkwtFile != null ? _selectedPkwtFile!.name : 'Pilih File PDF',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: _selectedPkwtFile != null ? AppColors.primaryBlue : const Color(0xFF1E293B),
+                if (_pkwtEntries.length > 1) const SizedBox(height: 8),
+
+                // ── Row: Tanggal Masuk | Tanggal Berakhir ─────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildLabeledDateField(
+                        label: 'Tanggal Masuk Kerja',
+                        value: entry.tglMasuk,
+                        onTap: () => _pickDate(
+                          'Tanggal Masuk',
+                          entry.tglMasuk,
+                          (d) => setState(() => entry.tglMasuk = d),
+                        ),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _selectedPkwtFile != null 
-                        ? '${(_selectedPkwtFile!.size / 1024 / 1024).toStringAsFixed(2)} MB'
-                        : 'Format yang didukung: PDF (Maks. 10MB)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (_selectedPkwtFile != null) ...[
-                    const SizedBox(height: 12),
-                    TextButton.icon(
-                      onPressed: _isLoading || _uploadingPkwt ? null : _clearPkwtFile,
-                      icon: const Icon(Icons.close, size: 16),
-                      label: const Text('Hapus File'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        textStyle: const TextStyle(fontSize: 13),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildLabeledDateField(
+                        label: 'Tanggal PKWT Berakhir',
+                        value: entry.tglBerakhir,
+                        onTap: () => _pickDate(
+                          'Tanggal PKWT Berakhir',
+                          entry.tglBerakhir,
+                          (d) => setState(() => entry.tglBerakhir = d),
+                        ),
                       ),
                     ),
                   ],
-                ],
-              ),
-            ),
-          ),
-          
+                ),
+                const SizedBox(height: 16),
+
+                // ── PKWT Ke- text input ───────────────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'PKWT Ke-',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: entry.pkwtKeController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Masukkan urutan PKWT',
+                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ── Upload File PKWT ──────────────────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'UPLOAD FILE PKWT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (hasFile)
+                      // File selected state
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryBlue.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.primaryBlue.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryBlue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.picture_as_pdf_rounded, color: AppColors.primaryBlue, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    entry.file!.name,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '${(entry.file!.size / 1024 / 1024).toStringAsFixed(2)} MB',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                // Re-pick button
+                                InkWell(
+                                  onTap: _isLoading || _uploadingPkwt ? null : () => _pickPkwtFileForEntry(idx),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Icon(Icons.refresh_rounded, size: 18, color: Colors.grey.shade500),
+                                  ),
+                                ),
+                                // Remove file button
+                                InkWell(
+                                  onTap: _isLoading || _uploadingPkwt ? null : () => _clearPkwtFileForEntry(idx),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Icon(Icons.close_rounded, size: 18, color: Colors.red.shade400),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      // Empty state — dashed upload box
+                      InkWell(
+                        onTap: _isLoading || _uploadingPkwt ? null : () => _pickPkwtFileForEntry(idx),
+                        borderRadius: BorderRadius.circular(10),
+                        child: _DashedBorder(
+                          borderRadius: 10,
+                          color: const Color(0xFFCBD5E1),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 28),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryBlue.withOpacity(0.08),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.cloud_upload_outlined, size: 28, color: AppColors.primaryBlue),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  RichText(
+                                    text: TextSpan(
+                                      style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                                      children: [
+                                        const TextSpan(text: 'Klik untuk pilih file'),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Format PDF maksimal 10MB',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          }),
+
+          const SizedBox(height: 20),
+
+          // ── Upload progress ──────────────────────────────────────────
           if (_uploadingPkwt) ...[
-            const SizedBox(height: 16),
             LinearProgressIndicator(
               backgroundColor: Colors.grey.shade200,
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
               borderRadius: BorderRadius.circular(4),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Mengupload dokumen PKWT...',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              textAlign: TextAlign.center,
+            Center(
+              child: Text(
+                'Mengupload dokumen PKWT...',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
             ),
+            const SizedBox(height: 12),
           ],
+
+          // ── Tambah PKWT Lainnya button ───────────────────────────────
+          GestureDetector(
+            onTap: _isLoading || _uploadingPkwt ? null : _addPkwtEntry,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: _isLoading || _uploadingPkwt
+                      ? Colors.grey.shade300
+                      : AppColors.primaryBlue.withOpacity(0.5),
+                ),
+                borderRadius: BorderRadius.circular(10),
+                color: AppColors.primaryBlue.withOpacity(0.03),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_circle_outline_rounded,
+                    size: 16,
+                    color: _isLoading || _uploadingPkwt
+                        ? Colors.grey.shade400
+                        : AppColors.primaryBlue,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Tambah PKWT Lainnya',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _isLoading || _uploadingPkwt
+                          ? Colors.grey.shade400
+                          : AppColors.primaryBlue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+
+  Widget _buildLabeledDateField({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value == null
+                        ? 'mm/dd/yyyy'
+                        : DateFormat('dd/MM/yyyy').format(value),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: value == null ? Colors.grey.shade400 : const Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+                Icon(Icons.calendar_today_rounded, size: 16, color: Colors.grey.shade500),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKeStepButton({required IconData icon, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+          borderRadius: BorderRadius.circular(6),
+          color: onTap == null ? Colors.grey.shade100 : Colors.white,
+        ),
+        child: Icon(icon, size: 14,
+            color: onTap == null ? Colors.grey.shade400 : const Color(0xFF334155)),
+      ),
+    );
+  }
+}
+
+/// Custom dashed-border container for upload area
+class _DashedBorder extends StatelessWidget {
+  final Widget child;
+  final double borderRadius;
+  final Color color;
+  const _DashedBorder({
+    required this.child,
+    required this.borderRadius,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(borderRadius: borderRadius, color: color),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final double borderRadius;
+  final Color color;
+  _DashedBorderPainter({required this.borderRadius, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    const dashWidth = 6.0;
+    const dashSpace = 4.0;
+    final r = borderRadius;
+    final rect = Rect.fromLTWH(0.75, 0.75, size.width - 1.5, size.height - 1.5);
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(r));
+    final path = Path()..addRRect(rrect);
+
+    final metrics = path.computeMetrics();
+    for (final metric in metrics) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final next = (distance + dashWidth).clamp(0, metric.length);
+        canvas.drawPath(
+          metric.extractPath(distance, next.toDouble()),
+          paint,
+        );
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color || old.borderRadius != borderRadius;
 }
