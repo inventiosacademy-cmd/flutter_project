@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/karyawan.dart';
-import '../services/activity_service.dart';
+
 import '../utils/error_helper.dart';
 
 class EmployeeProvider with ChangeNotifier {
@@ -77,15 +77,7 @@ class EmployeeProvider with ChangeNotifier {
           .collection('employees')
           .doc(employee.id)
           .set(employee.toMap());
-          
-      // LOG ACTIVITY: Add Employee
-      await ActivityService().logActivity(
-        actionType: 'CREATE',
-        targetCollection: 'employees',
-        targetId: employee.id,
-        targetName: employee.nama,
-        details: 'Added new employee: ${employee.nama}',
-      );
+
     } catch (e) {
       debugPrint("Error adding employee: $e");
       throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
@@ -121,13 +113,7 @@ class EmployeeProvider with ChangeNotifier {
       debugPrint("Committing batch to Firestore...");
       await batch.commit();
       debugPrint("Batch committed successfully!");
-      
-      // LOG ACTIVITY: Batch Add
-      await ActivityService().logActivity(
-        actionType: 'CREATE_BATCH',
-        targetCollection: 'employees',
-        details: 'Imported ${employees.length} employees from Excel',
-      );
+
     } catch (e) {
       debugPrint("Error adding employees batch: $e");
       throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
@@ -145,15 +131,7 @@ class EmployeeProvider with ChangeNotifier {
           .collection('employees')
           .doc(employee.id)
           .update(employee.toMap());
-          
-      // LOG ACTIVITY: Update Employee
-      await ActivityService().logActivity(
-        actionType: 'UPDATE',
-        targetCollection: 'employees',
-        targetId: employee.id,
-        targetName: employee.nama,
-        details: 'Updated employee details for: ${employee.nama}',
-      );
+
     } catch (e) {
       debugPrint("Error updating employee: $e");
       throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
@@ -171,14 +149,7 @@ class EmployeeProvider with ChangeNotifier {
           .collection('employees')
           .doc(id)
           .delete();
-          
-      // LOG ACTIVITY: Delete Employee
-      await ActivityService().logActivity(
-        actionType: 'DELETE',
-        targetCollection: 'employees',
-        targetId: id,
-        details: 'Deleted employee with ID: $id',
-      );
+
     } catch (e) {
       debugPrint("Error deleting employee: $e");
       throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));

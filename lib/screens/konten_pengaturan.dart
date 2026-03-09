@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/prov_auth.dart' as app_auth;
 import '../theme/warna.dart';
-import 'konten_riwayat_aktivitas.dart';
+
 
 class SettingsContent extends StatefulWidget {
   const SettingsContent({super.key});
@@ -160,18 +160,7 @@ class _SettingsContentState extends State<SettingsContent> {
             subtitle: "Ganti kata sandi akun Anda",
             onTap: () => _resetPassword(context),
           ),
-          
-          _buildActionItem(
-            icon: Icons.history_edu,
-            title: "Riwayat Aktivitas",
-            subtitle: "Lihat log login & perubahan data",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ActivityLogScreen()),
-              );
-            },
-          ),
+
           
           _buildSectionHeader("Notifikasi"),
           _buildActionItem(
@@ -298,54 +287,204 @@ class _SettingsContentState extends State<SettingsContent> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("Edit Profil"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: "Nama Lengkap",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: jobController,
-              decoration: const InputDecoration(
-                labelText: "Jabatan / Posisi",
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              authProvider.updateUserInfo(nameController.text, jobController.text);
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Profil berhasil diperbarui"),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 1),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 16, 16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE1F5FE), // Light blue 50
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.person, color: Color(0xFF0288D1), size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Text(
+                        "Edit Profil",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      splashRadius: 24,
+                    ),
+                  ],
                 ),
-              );
-            },
-            child: const Text("Simpan"),
+              ),
+              const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+              
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Info Box
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F9FF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE0F2FE)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info, color: Color(0xFF0EA5E9), size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "INFORMASI PROFIL",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                      color: Color(0xFF0EA5E9),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    "Perbarui nama lengkap dan jabatan Anda. Perubahan akan langsung terlihat di seluruh aplikasi setelah disimpan.",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF475569),
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Form: Nama Lengkap
+                      const Text(
+                        "Nama Lengkap",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: nameController,
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                        decoration: InputDecoration(
+                          hintText: "Masukkan nama lengkap",
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.badge, color: Color(0xFF94A3B8), size: 20),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Form: Jabatan
+                      const Text(
+                        "Jabatan / Posisi",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: jobController,
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                        decoration: InputDecoration(
+                          hintText: "Masukkan jabatan (contoh: HR Manager)",
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.work, color: Color(0xFF94A3B8), size: 20),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Save Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0EA5E9),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            authProvider.updateUserInfo(nameController.text, jobController.text);
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Profil berhasil diperbarui"),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                          child: const Text("Simpan", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -467,178 +606,245 @@ class _SettingsContentState extends State<SettingsContent> {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+        builder: (context, setState) => Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.email_outlined, color: AppColors.primaryBlue),
-              SizedBox(width: 12),
-              Text("Pengaturan Email Notifikasi"),
-            ],
-          ),
-          content: isLoading
-              ? const SizedBox(
-                  height: 200,
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 16, 16),
+                  child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: const Color(0xFFE1F5FE), // Light blue 50
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
                         ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline, color: AppColors.primaryBlue, size: 20),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                "Atur email Anda untuk menerima notifikasi PKWT yang akan segera berakhir",
-                                style: TextStyle(fontSize: 12, color: AppColors.primaryBlue),
-                              ),
-                            ),
-                          ],
-                        ),
+                        child: const Icon(Icons.notifications_active, color: Color(0xFF0288D1), size: 24),
                       ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: emailPenerimaController,
-                        decoration: InputDecoration(
-                          labelText: "Email Penerima Notifikasi",
-                          hintText: "your.email@gmail.com",
-                          prefixIcon: const Icon(Icons.mark_email_read_outlined),
-                          helperText: "Email Anda untuk menerima notifikasi",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Text(
+                          "Pengaturan Notifikasi",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
                           ),
                         ),
-                        keyboardType: TextInputType.emailAddress,
                       ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Jadwal Notifikasi:",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              "• Setiap hari jam 08:00 WIB\n• Untuk karyawan dengan PKWT ≤ 30 hari",
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          ],
-                        ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        splashRadius: 24,
                       ),
                     ],
                   ),
                 ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Batal"),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: isSaving
-                  ? null
-                  : () async {
-                      if (emailPenerimaController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Email penerima harus diisi"),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      setState(() => isSaving = true);
-
-                      try {
-                        final auth = FirebaseAuth.instance;
-                        final currentUser = auth.currentUser;
-                        
-                        if (currentUser == null) {
-                          throw "Sesi login tidak valid. Silakan login kembali.";
-                        }
-                        
-                        final activeUid = currentUser.uid;
-                        debugPrint("DEBUG: Saving notification settings for user $activeUid");
-
-                        // Save Individual Receiver Preference only
-                        // Email pengirim and password are managed by admin in backend
-                        debugPrint("DEBUG: Saving to users/$activeUid/settings/notifications...");
-                        try {
-                          await FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(activeUid)
-                              .collection('settings')
-                              .doc('notifications')
-                              .set({
-                            'emailPenerima': emailPenerimaController.text.trim(), 
-                            'hariSebelumExpired': [30, 14, 7, 3, 1],
-                            'updatedAt': FieldValue.serverTimestamp(),
-                            'userId': activeUid,
-                          }, SetOptions(merge: true));
-                          debugPrint("DEBUG: User settings saved successfully");
-                        } catch (e) {
-                          debugPrint("DEBUG: User settings FAILED: $e");
-                          throw "Gagal menyimpan pengaturan email: $e";
-                        }
-
-                        if (context.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("✅ Pengaturan email berhasil disimpan"),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        debugPrint("FIREBASE SAVE ERROR: $e");
-                        setState(() => isSaving = false);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Error: $e"),
-                              backgroundColor: Colors.red,
-                              duration: const Duration(seconds: 10),
-                              action: SnackBarAction(
-                                label: "Tutup",
-                                textColor: Colors.white,
-                                onPressed: () {},
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                
+                // Content
+                Flexible(
+                  child: isLoading
+                      ? const SizedBox(
+                          height: 200,
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Info Box
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0F9FF),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFE0F2FE)),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(Icons.info, color: Color(0xFF0EA5E9), size: 20),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            "INFORMASI PENGINGAT PKWT",
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.5,
+                                              color: Color(0xFF0EA5E9),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          const Text(
+                                            "Atur email penerima untuk mendapatkan notifikasi otomatis sebelum masa berlaku PKWT berakhir. Sistem akan mengirimkan pengingat harian pada jam 08:00 WIB agar proses perpanjangan tepat waktu.",
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF475569),
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        }
-                      }
-                    },
-              child: isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text("Simpan"),
+                              const SizedBox(height: 32),
+                              
+                              // Form
+                              const Text(
+                                "Alamat Email Penerima",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: emailPenerimaController,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                                decoration: InputDecoration(
+                                  hintText: "contoh@perusahaan.com",
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                  prefixIcon: const Icon(Icons.email, color: Color(0xFF94A3B8), size: 20),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 1.5),
+                                  ),
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                              ),
+                              const SizedBox(height: 32),
+                              
+                              // Save Button
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0EA5E9), // Light blue similar to image
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: isSaving
+                                      ? null
+                                      : () async {
+                                          if (emailPenerimaController.text.isEmpty) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text("Email penerima harus diisi"),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                            return;
+                                          }
+
+                                          setState(() => isSaving = true);
+
+                                          try {
+                                            final auth = FirebaseAuth.instance;
+                                            final currentUser = auth.currentUser;
+                                            
+                                            if (currentUser == null) {
+                                              throw "Sesi login tidak valid. Silakan login kembali.";
+                                            }
+                                            
+                                            final activeUid = currentUser.uid;
+                                            debugPrint("DEBUG: Saving notification settings for user $activeUid");
+
+                                            // Save Individual Receiver Preference only
+                                            // Email pengirim and password are managed by admin in backend
+                                            debugPrint("DEBUG: Saving to users/$activeUid/settings/notifications...");
+                                            try {
+                                              await FirebaseFirestore.instance
+                                                  .collection('users')
+                                                  .doc(activeUid)
+                                                  .collection('settings')
+                                                  .doc('notifications')
+                                                  .set({
+                                                'emailPenerima': emailPenerimaController.text.trim(), 
+                                                'hariSebelumExpired': [30, 14, 7, 3, 1],
+                                                'updatedAt': FieldValue.serverTimestamp(),
+                                                'userId': activeUid,
+                                              }, SetOptions(merge: true));
+                                              debugPrint("DEBUG: User settings saved successfully");
+                                            } catch (e) {
+                                              debugPrint("DEBUG: User settings FAILED: $e");
+                                              throw "Gagal menyimpan pengaturan email: $e";
+                                            }
+
+                                            if (context.mounted) {
+                                              Navigator.pop(ctx);
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text("✅ Pengaturan email berhasil disimpan"),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                          } catch (e) {
+                                            debugPrint("FIREBASE SAVE ERROR: $e");
+                                            setState(() => isSaving = false);
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text("Error: $e"),
+                                                  backgroundColor: Colors.red,
+                                                  duration: const Duration(seconds: 10),
+                                                  action: SnackBarAction(
+                                                    label: "Tutup",
+                                                    textColor: Colors.white,
+                                                    onPressed: () {},
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                  child: isSaving
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : const Text("Simpan", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

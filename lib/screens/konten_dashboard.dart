@@ -42,7 +42,7 @@ class _DashboardContentState extends State<DashboardContent> {
   int _currentPage = 1;
   int _itemsPerPage = 10;
   
-  final List<String> _deptList = ['Semua', 'IT', 'Human Resources', 'Finance', 'Marketing', 'Sales', 'Operations', 'Product', 'Legal'];
+  final List<String> _deptList = ['Semua', 'HCGS', 'SCM', 'FAT', 'OPERASIONAL', 'PLANT', 'TDC'];
   final List<String> _statusList = ['Semua', 'Aktif', 'Segera Habis', 'Expired'];
   final List<String> _evaluasiList = ['Semua', 'Sudah Evaluasi', 'Belum Evaluasi', 'Perlu Evaluasi'];
 
@@ -153,32 +153,32 @@ class _DashboardContentState extends State<DashboardContent> {
                   children: [
                     Expanded(child: _buildStatCard(
                       icon: Icons.people_alt_outlined,
-                      iconBgColor: const Color(0xFFEEF2FF),
-                      iconColor: const Color(0xFF6366F1),
+                      iconBgColor: AppColors.primaryBlue.withOpacity(0.1),
+                      iconColor: AppColors.primaryBlue,
                       label: "Total Karyawan",
                       value: "$total",
                     )),
                     const SizedBox(width: 16),
                     Expanded(child: _buildStatCard(
                       icon: Icons.check_circle_outline,
-                      iconBgColor: const Color(0xFFD1FAE5),
-                      iconColor: const Color(0xFF22C55E),
+                      iconBgColor: AppColors.primaryBlue.withOpacity(0.1),
+                      iconColor: AppColors.primaryBlue,
                       label: "Karyawan Aktif",
                       value: "$aktif",
                     )),
                     const SizedBox(width: 16),
                     Expanded(child: _buildStatCard(
                       icon: Icons.cancel_outlined,
-                      iconBgColor: const Color(0xFFFEE2E2),
-                      iconColor: const Color(0xFFEF4444),
+                      iconBgColor: AppColors.primaryBlue.withOpacity(0.1),
+                      iconColor: AppColors.primaryBlue,
                       label: "Tidak Aktif",
                       value: "$tidakAktif",
                     )),
                     const SizedBox(width: 16),
                     Expanded(child: _buildStatCard(
                       icon: Icons.warning_amber_outlined,
-                      iconBgColor: const Color(0xFFFEF3C7),
-                      iconColor: const Color(0xFFF59E0B),
+                      iconBgColor: AppColors.primaryBlue.withOpacity(0.1),
+                      iconColor: AppColors.primaryBlue,
                       label: "PKWT Segera Habis",
                       value: "$pkwtSegeraHabis",
                     )),
@@ -187,11 +187,11 @@ class _DashboardContentState extends State<DashboardContent> {
               },
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 16),
 
             // Search and Filters
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -227,20 +227,29 @@ class _DashboardContentState extends State<DashboardContent> {
                               borderRadius: BorderRadius.circular(10),
                               borderSide: BorderSide.none,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
                       ),
                       const SizedBox(width: 16),
-                      _buildDeptDropdown(),
-                      const SizedBox(width: 12),
-                      _buildStatusDropdown(),
-                      const SizedBox(width: 12),
-                      _buildEvaluasiDropdown(),
+                      SizedBox(
+                        width: 170,
+                        child: _buildDeptDropdown(),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 170,
+                        child: _buildStatusDropdown(),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 170,
+                        child: _buildEvaluasiDropdown(),
+                      ),
                     ],
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // Table Header
                   Container(
@@ -537,12 +546,12 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: iconBgColor,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -571,77 +580,92 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildDeptDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
+    return DropdownButtonFormField<String>(
+      decoration: InputDecoration(
+        labelText: "DEPARTEMEN",
+        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 0.5),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text("Dept: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedDept,
-              icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-              items: _deptList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: (v) => setState(() => _selectedDept = v!),
-            ),
-          ),
-        ],
-      ),
+      isExpanded: true,
+      value: _selectedDept,
+      icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+      style: TextStyle(fontSize: 13, color: Colors.grey.shade800, fontWeight: FontWeight.w600),
+      items: _deptList.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: (v) => setState(() => _selectedDept = v!),
     );
   }
 
   Widget _buildStatusDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
+    return DropdownButtonFormField<String>(
+      decoration: InputDecoration(
+        labelText: "STATUS",
+        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 0.5),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text("Status: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedStatus,
-              icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-              items: _statusList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: (v) => setState(() => _selectedStatus = v!),
-            ),
-          ),
-        ],
-      ),
+      isExpanded: true,
+      value: _selectedStatus,
+      icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+      style: TextStyle(fontSize: 13, color: Colors.grey.shade800, fontWeight: FontWeight.w600),
+      items: _statusList.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: (v) => setState(() => _selectedStatus = v!),
     );
   }
 
   Widget _buildEvaluasiDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
+    return DropdownButtonFormField<String>(
+      decoration: InputDecoration(
+        labelText: "EVALUASI",
+        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 0.5),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text("Evaluasi: ", style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedEvaluasi,
-              icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-              items: _evaluasiList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: (v) => setState(() => _selectedEvaluasi = v!),
-            ),
-          ),
-        ],
-      ),
+      isExpanded: true,
+      value: _selectedEvaluasi,
+      icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+      style: TextStyle(fontSize: 13, color: Colors.grey.shade800, fontWeight: FontWeight.w600),
+      items: _evaluasiList.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: (v) => setState(() => _selectedEvaluasi = v!),
     );
   }
 
@@ -673,15 +697,15 @@ class _DashboardContentState extends State<DashboardContent> {
     if (daysLeft <= 0) {
       statusText = "Expired";
       statusColor = const Color(0xFFEF4444);
-      statusBgColor = const Color(0xFFFEE2E2);
+      statusBgColor = Colors.transparent;
     } else if (daysLeft < 30) {
       statusText = "Segera Berakhir";
       statusColor = const Color(0xFFF59E0B);
-      statusBgColor = const Color(0xFFFEF3C7);
+      statusBgColor = Colors.transparent;
     } else {
       statusText = "Aktif";
       statusColor = const Color(0xFF22C55E);
-      statusBgColor = const Color(0xFFD1FAE5);
+      statusBgColor = Colors.transparent;
     }
 
     return Container(
@@ -827,15 +851,15 @@ class _DashboardContentState extends State<DashboardContent> {
                 if (hasEvaluation) {
                   evalText = "Sudah Evaluasi";
                   evalColor = const Color(0xFF22C55E);
-                  evalBgColor = const Color(0xFFD1FAE5);
+                  evalBgColor = Colors.transparent;
                 } else if (daysLeft < 30) {
                   evalText = "Perlu Evaluasi";
                   evalColor = const Color(0xFFEF4444);
-                  evalBgColor = const Color(0xFFFEE2E2);
+                  evalBgColor = Colors.transparent;
                 } else {
                   evalText = "Belum Evaluasi";
                   evalColor = const Color(0xFF6B7280);
-                  evalBgColor = const Color(0xFFF3F4F6);
+                  evalBgColor = Colors.transparent;
                 }
                 
                 return Center(
@@ -1128,36 +1152,20 @@ class _DashboardContentState extends State<DashboardContent> {
                 const SizedBox(height: 28),
 
                 // Action buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        child: const Text("Batal", style: TextStyle(color: Color(0xFF64748B))),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.send_rounded, size: 18),
+                    label: const Text("Kirim Email"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.send_rounded, size: 18),
-                        label: const Text("Kirim Email"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryBlue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: () => Navigator.pop(ctx, true),
-                      ),
-                    ),
-                  ],
+                    onPressed: () => Navigator.pop(ctx, true),
+                  ),
                 ),
               ],
             ),

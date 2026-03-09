@@ -106,8 +106,6 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                     Expanded(
                       child: _buildStatCard(
                         icon: Icons.assessment_outlined,
-                        iconBgColor: const Color(0xFFEEF2FF),
-                        iconColor: const Color(0xFF6366F1),
                         label: "Total Evaluasi",
                         value: "${stats['total']}",
                       ),
@@ -115,9 +113,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildStatCard(
-                        icon: Icons.edit_note_outlined,
-                        iconBgColor: const Color(0xFFFEF3C7),
-                        iconColor: const Color(0xFFF59E0B),
+                        icon: Icons.edit_note_rounded,
                         label: "Draft",
                         value: "${stats['draft']}",
                       ),
@@ -125,9 +121,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildStatCard(
-                        icon: Icons.pending_outlined,
-                        iconBgColor: const Color(0xFFDDD6FE),
-                        iconColor: const Color(0xFF8B5CF6),
+                        icon: Icons.pending_actions_rounded,
                         label: "Belum TTD Atasan",
                         value: "${stats['belumTTD']}",
                       ),
@@ -135,9 +129,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildStatCard(
-                        icon: Icons.check_circle_outline,
-                        iconBgColor: const Color(0xFFD1FAE5),
-                        iconColor: const Color(0xFF22C55E),
+                        icon: Icons.check_circle_outline_rounded,
                         label: "Selesai",
                         value: "${stats['selesai']}",
                       ),
@@ -348,13 +340,11 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
 
   Widget _buildStatCard({
     required IconData icon,
-    required Color iconBgColor,
-    required Color iconColor,
     required String label,
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -367,29 +357,31 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFE0F2FE), // Light sky blue
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: Icon(icon, color: const Color(0xFF0EA5E9), size: 20), // Primary blue
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1E293B),
                   ),

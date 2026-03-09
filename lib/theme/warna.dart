@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 /// App color palette for HR Dashboard
 class AppColors {
   // Primary gradient colors
-  static const Color primaryBlue = Color(0xFF2563EB);
-  static const Color primaryIndigo = Color(0xFF4F46E5);
-  static const Color primaryPurple = Color(0xFF7C3AED);
+  static const Color primaryBlue = Color(0xFF0EA5E9); // Sky blue
+  static const Color primaryIndigo = Color(0xFF0284C7); // Darker sky blue
+  static const Color primaryPurple = Color(0xFF0369A1); // Even darker sky blue
   
   // Gradient definitions
   static const LinearGradient primaryGradient = LinearGradient(
@@ -15,7 +15,7 @@ class AppColors {
   );
   
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+    colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -47,7 +47,7 @@ class AppColors {
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
   static const Color error = Color(0xFFEF4444);
-  static const Color info = Color(0xFF3B82F6);
+  static const Color info = Color(0xFF0EA5E9);
   
   // Shadows
   static List<BoxShadow> cardShadow = [

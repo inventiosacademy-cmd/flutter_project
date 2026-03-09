@@ -27,7 +27,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
   late TextEditingController _atasanController;
   late TextEditingController _pkwtKeController;
   
-  String _departemen = 'IT';
+  String _departemen = 'HCGS';
   DateTime? _tglMasuk;
   DateTime? _tglPkwtBerakhir;
   bool _isLoading = false;
@@ -55,14 +55,12 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
   }
 
   final List<String> _departemenList = [
-    'IT',
-    'Human Resources',
-    'Finance',
-    'Marketing',
-    'Sales',
-    'Operations',
-    'Product',
-    'Legal',
+    'HCGS',
+    'SCM',
+    'FAT',
+    'OPERASIONAL',
+    'PLANT',
+    'TDC',
   ];
 
   void _submit() async {
@@ -211,24 +209,299 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
   }
 
   Future<void> _pickDate(String label, DateTime? initial, Function(DateTime) onPicked) async {
-    final picked = await showDatePicker(
+    final DateTime now = DateTime.now();
+    DateTime tempDate = initial ?? now;
+    
+    final picked = await showDialog<DateTime>(
       context: context,
-      initialDate: initial ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2040),
-      helpText: label,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primaryBlue,
-              onPrimary: Colors.white,
-            ),
-          ),
-          child: child!,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setStateBuilder) {
+            // Function to get days in month
+            int getDaysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
+            // Function to get first day offset (0 = Sunday, 1 = Monday, etc.)
+            int getFirstDayOffset(int year, int month) => DateTime(year, month, 1).weekday % 7;
+            
+            final int daysInMonth = getDaysInMonth(tempDate.year, tempDate.month);
+            final int firstDayOffset = getFirstDayOffset(tempDate.year, tempDate.month);
+            
+            final List<String> months = [
+              'January', 'February', 'March', 'April', 'May', 'June',
+              'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+            
+            final List<int> years = List.generate(41, (index) => 2000 + index); // 2000 to 2040
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 16, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Select Date",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B), // Dark slate
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              // Removing "Choose a day for your schedule" as requested
+                            ],
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 20),
+                            visualDensity: VisualDensity.compact,
+                            splashRadius: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                    
+                    // Month & Year Selectors
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Row(
+                        children: [
+                          // Month Dropdown
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "MONTH",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF94A3B8),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      isExpanded: true,
+                                      value: tempDate.month,
+                                      icon: const Icon(Icons.unfold_more, size: 16, color: Color(0xFF94A3B8)),
+                                      style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+                                      items: List.generate(12, (i) => DropdownMenuItem(
+                                        value: i + 1,
+                                        child: Text(months[i]),
+                                      )),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setStateBuilder(() {
+                                            tempDate = DateTime(tempDate.year, val, tempDate.day > getDaysInMonth(tempDate.year, val) ? getDaysInMonth(tempDate.year, val) : tempDate.day);
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          // Year Dropdown
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "YEAR",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF94A3B8),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      isExpanded: true,
+                                      value: tempDate.year,
+                                      icon: const Icon(Icons.unfold_more, size: 16, color: Color(0xFF94A3B8)),
+                                      style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+                                      items: years.map((y) => DropdownMenuItem(
+                                        value: y,
+                                        child: Text(y.toString()),
+                                      )).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setStateBuilder(() {
+                                            tempDate = DateTime(val, tempDate.month, tempDate.day > getDaysInMonth(val, tempDate.month) ? getDaysInMonth(val, tempDate.month) : tempDate.day);
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Calendar Grid
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
+                          // Days of week
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].map((day) => 
+                              SizedBox(
+                                width: 32,
+                                child: Text(
+                                  day,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              )
+                            ).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                          // Dates
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: 42, // 6 rows of 7 days
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 7,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              childAspectRatio: 1,
+                            ),
+                            itemBuilder: (context, index) {
+                              // Previous month days
+                              if (index < firstDayOffset) {
+                                final prevMonthDays = getDaysInMonth(
+                                  tempDate.month == 1 ? tempDate.year - 1 : tempDate.year,
+                                  tempDate.month == 1 ? 12 : tempDate.month - 1
+                                );
+                                final day = prevMonthDays - firstDayOffset + index + 1;
+                                return Center(
+                                  child: Text(
+                                    day.toString(),
+                                    style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+                                  ),
+                                );
+                              }
+                              
+                              // Current month days
+                              final day = index - firstDayOffset + 1;
+                              if (day <= daysInMonth) {
+                                final isSelected = tempDate.day == day;
+                                return InkWell(
+                                  onTap: () {
+                                    setStateBuilder(() {
+                                      tempDate = DateTime(tempDate.year, tempDate.month, day);
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    decoration: isSelected
+                                        ? BoxDecoration(
+                                            color: const Color(0xFF0EA5E9), // Blue accent instead of orange
+                                            borderRadius: BorderRadius.circular(8),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFF0EA5E9).withOpacity(0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          )
+                                        : null,
+                                    child: Center(
+                                      child: Text(
+                                        day.toString(),
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.white : const Color(0xFF334155),
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              
+                              // Next month days
+                              return const SizedBox.shrink(); // Hide extra rows if empty
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                    
+                    // Footer Buttons
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, tempDate),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0EA5E9), // Blue accent instead of orange
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text("Apply Date", style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
+
     if (picked != null) {
       setState(() => onPicked(picked));
     }

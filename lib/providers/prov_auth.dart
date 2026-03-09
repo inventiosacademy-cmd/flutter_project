@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
-import '../services/activity_service.dart';
+
 
 class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -144,8 +144,7 @@ class AuthProvider with ChangeNotifier {
       
       await _auth.signInWithEmailAndPassword(email: email, password: password);
       
-      // LOG ACTIVITY: Login Success
-      await ActivityService().logLogin();
+
       
       return null; // Success, no error
     } on FirebaseAuthException catch (e) {
@@ -204,10 +203,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
-    // LOG ACTIVITY: Logout
-    if (_auth.currentUser != null) {
-       await ActivityService().logLogout();
-    }
+
     
     _cancelIdleTimer();
     await _auth.signOut();
