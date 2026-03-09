@@ -101,6 +101,18 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _navigateToRiwayat() {
+    setState(() {
+      _showTambahKaryawan = false;
+      _showEvaluasi = false;
+      _showDetailKaryawan = false;
+      _showRiwayatEvaluasi = true;
+      _selectedIndex = 1;
+      _evaluasiEmployee = null;
+      _detailEmployee = null;
+    });
+  }
+
   Widget _buildContent() {
     if (_showTambahKaryawan) {
       return KontenTambahKaryawan(
@@ -130,6 +142,7 @@ class _MainScreenState extends State<MainScreen> {
       onEvaluasi: _navigateToEvaluasi,
       onViewDetail: _navigateToDetail,
       onEdit: _navigateToEditKaryawan,
+      onNavigateToRiwayat: _navigateToRiwayat,
     );
   }
 

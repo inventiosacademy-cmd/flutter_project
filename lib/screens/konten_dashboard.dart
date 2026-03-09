@@ -17,6 +17,7 @@ class DashboardContent extends StatefulWidget {
   final Function(Employee)? onEvaluasi;
   final Function(Employee)? onViewDetail;
   final Function(Employee)? onEdit;
+  final VoidCallback? onNavigateToRiwayat;
   
   const DashboardContent({
     super.key, 
@@ -24,6 +25,7 @@ class DashboardContent extends StatefulWidget {
     this.onEvaluasi,
     this.onViewDetail,
     this.onEdit,
+    this.onNavigateToRiwayat,
   });
 
   @override
@@ -821,14 +823,13 @@ class _DashboardContentState extends State<DashboardContent> {
           Expanded(
             child: Consumer2<EvaluasiProvider, EvaluationUploadProvider>(
               builder: (context, evaluasiProvider, uploadProvider, _) {
-                // Check if employee has evaluation (sistem OR manual upload) for CURRENT PKWT Ke
                 final hasSistemEval = evaluasiProvider
                     .getEvaluasiByEmployee(emp.id)
                     .where((e) => e.pkwtKe == emp.pkwtKe)
                     .isNotEmpty;
                 final hasEvaluation = hasSistemEval ||
                     uploadProvider.hasEvaluationUpload(emp.id, emp.pkwtKe);
-                
+
                 // Jika expired, tidak perlu evaluasi - tampilkan '-'
                 if (daysLeft <= 0) {
                   return Center(
@@ -842,11 +843,11 @@ class _DashboardContentState extends State<DashboardContent> {
                     ),
                   );
                 }
-                
+
                 String evalText;
                 Color evalColor;
                 Color evalBgColor;
-                
+
                 // Evaluation Status Logic
                 if (hasEvaluation) {
                   evalText = "Sudah Evaluasi";
@@ -861,7 +862,7 @@ class _DashboardContentState extends State<DashboardContent> {
                   evalColor = const Color(0xFF6B7280);
                   evalBgColor = Colors.transparent;
                 }
-                
+
                 return Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -930,7 +931,11 @@ class _DashboardContentState extends State<DashboardContent> {
                           } else if (value == 'evaluate_sistem') {
                             widget.onEvaluasi?.call(emp);
                           } else if (value == 'evaluate_manual') {
-                            ManualEvaluationDialog.show(context, emp);
+                            ManualEvaluationDialog.show(
+                              context,
+                              emp,
+                              onPrinted: widget.onNavigateToRiwayat,
+                            );
                           } else if (value == 'edit') {
                             widget.onEdit?.call(emp);
                           } else if (value == 'email') {

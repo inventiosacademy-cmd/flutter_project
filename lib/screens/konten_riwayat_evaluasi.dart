@@ -1,10 +1,15 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/prov_evaluasi.dart';
+import '../providers/prov_evaluation_upload.dart';
+import '../providers/prov_karyawan.dart';
 import '../models/evaluasi.dart';
+import '../models/karyawan.dart';
 import '../theme/warna.dart';
 import '../services/pdf_generator.dart';
+import '../services/evaluation_upload_service.dart';
 import 'package:printing/printing.dart';
 import '../widgets/pdf_preview_dialog.dart';
 import 'edit_evaluasi.dart';
@@ -98,39 +103,47 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
             const SizedBox(height: 28),
 
             // Stats Cards
-            Consumer<EvaluasiProvider>(
-              builder: (context, provider, _) {
+            Consumer2<EvaluasiProvider, EvaluationUploadProvider>(
+              builder: (context, provider, uploadProvider, _) {
                 final stats = provider.getStats();
+                // Count total manual uploads across all employees
+                final totalManual = uploadProvider.totalUploads;
                 return Row(
                   children: [
                     Expanded(
                       child: _buildStatCard(
                         icon: Icons.assessment_outlined,
                         label: "Total Evaluasi",
+                        value: "${(stats['total'] ?? 0) + totalManual}",
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildStatCard(
+                        icon: Icons.computer_outlined,
+                        iconBgColor: const Color(0xFFD1FAE5),
+                        iconColor: const Color(0xFF22C55E),
+                        label: "Evaluasi Sistem",
                         value: "${stats['total']}",
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildStatCard(
-                        icon: Icons.edit_note_rounded,
-                        label: "Draft",
-                        value: "${stats['draft']}",
+                        icon: Icons.upload_file_outlined,
+                        iconBgColor: const Color(0xFFE0F2FE),
+                        iconColor: const Color(0xFF0284C7),
+                        label: "Evaluasi Manual",
+                        value: "$totalManual",
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildStatCard(
-                        icon: Icons.pending_actions_rounded,
-                        label: "Belum TTD Atasan",
-                        value: "${stats['belumTTD']}",
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildStatCard(
-                        icon: Icons.check_circle_outline_rounded,
-                        label: "Selesai",
+                        icon: Icons.check_circle_outline,
+                        iconBgColor: const Color(0xFFD1FAE5),
+                        iconColor: const Color(0xFF22C55E),
+                        label: "Selesai (Sistem)",
                         value: "${stats['selesai']}",
                       ),
                     ),
@@ -204,32 +217,112 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                         _buildTableHeader("KARYAWAN", flex: 2),
                         _buildTableHeader("TANGGAL", flex: 1),
                         _buildTableHeader("PKWT KE", center: true),
+                        _buildTableHeader("TIPE", center: true),
+                        _buildTableHeader("STATUS UPLOAD", center: true),
                         _buildTableHeader("AKSI", flex: 1, center: true),
                       ],
                     ),
                   ),
 
                   // Table Content
-                  Consumer<EvaluasiProvider>(
-                    builder: (context, provider, _) {
-                      final allEvaluasi = provider.getFilteredEvaluasi(
+                  Consumer2<EvaluasiProvider, EvaluationUploadProvider>(
+                    builder: (context, provider, uploadProvider, _) {
+                      final employeeProvider = Provider.of<EmployeeProvider>(context, listen: false);
+
+                      // System evaluations filtered
+                      final allSistemEvaluasi = provider.getFilteredEvaluasi(
                         timeFilter: _selectedTimeFilter,
                         divisiFilter: _selectedDivisiFilter,
                         searchQuery: _searchQuery,
                       );
-                      final totalData = provider.evaluasiList.length;
-                      final totalFiltered = allEvaluasi.length;
-                      
+
+                      // All manual uploads (from all employees)
+                      final allUploads = uploadProvider.allUploads;
+                      // Filter manual uploads by search query
+                      final filteredUploads = allUploads.where((u) {
+                        final emp = employeeProvider.employees.firstWhere(
+                          (e) => e.id == u.employeeId,
+                          orElse: () => Employee.empty(),
+                        );
+                        if (_searchQuery.isNotEmpty) {
+                          final q = _searchQuery.toLowerCase();
+                          if (!emp.nama.toLowerCase().contains(q) &&
+                              !emp.posisi.toLowerCase().contains(q)) {
+                            return false;
+                          }
+                        }
+                        return true;
+                      }).toList();
+
+                      // Build unified list
+                      final List<Map<String, dynamic>> rows = [];
+
+                      for (final ev in allSistemEvaluasi) {
+                        rows.add({
+                          'date': ev.tanggalEvaluasi,
+                          'name': ev.employeeName,
+                          'position': ev.employeePosition,
+                          'pkwtKe': ev.pkwtKe,
+                          'tipe': 'Sistem',
+                          'statusUpload': null,
+                          'eval': ev,
+                        });
+                      }
+
+                      for (final up in filteredUploads) {
+                        final emp = employeeProvider.employees.firstWhere(
+                          (e) => e.id == up.employeeId,
+                          orElse: () => Employee.empty(),
+                        );
+                        rows.add({
+                          'date': up.uploadedAt,
+                          'name': emp.nama.isNotEmpty ? emp.nama : up.employeeId,
+                          'position': emp.posisi,
+                          'pkwtKe': up.pkwtKe,
+                          'tipe': 'Manual',
+                          'statusUpload': true,
+                          'upload': up,
+                          'emp': emp,
+                        });
+                      }
+
+                      // Pending: template printed/downloaded but not yet uploaded
+                      for (final pending in uploadProvider.pendingManualEvals) {
+                        // Skip if search query doesn't match
+                        final emp = employeeProvider.employees.firstWhere(
+                          (e) => e.id == pending.employeeId,
+                          orElse: () => Employee.empty(),
+                        );
+                        if (_searchQuery.isNotEmpty) {
+                          final q = _searchQuery.toLowerCase();
+                          if (!emp.nama.toLowerCase().contains(q) &&
+                              !emp.posisi.toLowerCase().contains(q)) {
+                            continue;
+                          }
+                        }
+                        rows.add({
+                          'date': DateTime.now(),
+                          'name': emp.nama.isNotEmpty ? emp.nama : pending.employeeId,
+                          'position': emp.posisi,
+                          'pkwtKe': pending.pkwtKe,
+                          'tipe': 'Manual',
+                          'statusUpload': false,
+                          'emp': emp,
+                        });
+                      }
+
+                      // Sort by date descending
+                      rows.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+
+                      final totalFiltered = rows.length;
+
                       // Pagination
-                      final totalPages = (totalFiltered / _itemsPerPage).ceil();
+                      final totalPages = totalFiltered == 0 ? 1 : (totalFiltered / _itemsPerPage).ceil();
                       final startIndex = (_currentPage - 1) * _itemsPerPage;
                       final endIndex = (startIndex + _itemsPerPage).clamp(0, totalFiltered);
-                      final evaluasiList = allEvaluasi.sublist(
-                        startIndex.clamp(0, totalFiltered),
-                        endIndex,
-                      );
+                      final pageRows = totalFiltered == 0 ? <Map<String, dynamic>>[] : rows.sublist(startIndex, endIndex);
 
-                      if (allEvaluasi.isEmpty) {
+                      if (rows.isEmpty) {
                         return Container(
                           padding: const EdgeInsets.all(40),
                           child: Center(
@@ -251,9 +344,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
 
                       return Column(
                         children: [
-                          ...evaluasiList.map((evaluasi) {
-                            return _buildEvaluasiRow(evaluasi, provider);
-                          }).toList(),
+                          ...pageRows.map((row) => _buildUnifiedRow(row, provider, uploadProvider)),
                           // Pagination controls
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -287,7 +378,7 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                                           ],
                                         ),
                                       ),
-                                      itemBuilder: (context) => [5, 10, 25, 50].map((val) => 
+                                      itemBuilder: (context) => [5, 10, 25, 50].map((val) =>
                                         PopupMenuItem(value: val, child: Text("$val"))
                                       ).toList(),
                                     ),
@@ -485,13 +576,196 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
     );
   }
 
-  Widget _buildEvaluasiRow(Evaluasi evaluasi, EvaluasiProvider provider) {
+  /// Baris unified (sistem + manual)
+  Widget _buildUnifiedRow(Map<String, dynamic> row, EvaluasiProvider provider, EvaluationUploadProvider uploadProvider) {
+    final isSistem = row['tipe'] == 'Sistem';
+    final name = row['name'] as String;
+    final position = row['position'] as String;
+    final pkwtKe = row['pkwtKe'] as int;
+    final date = row['date'] as DateTime;
+    final statusUpload = row['statusUpload'] as bool?;
+
+    // Tipe badge
+    Widget tipeBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSistem ? const Color(0xFFD1FAE5) : const Color(0xFFE0F2FE),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        isSistem ? 'Sistem' : 'Manual',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: isSistem ? const Color(0xFF059669) : const Color(0xFF0284C7),
+        ),
+      ),
+    );
+
+    // Status upload badge
+    Widget statusUploadBadge;
+    if (isSistem) {
+      statusUploadBadge = Text('-', style: TextStyle(color: Colors.grey.shade400, fontSize: 13));
+    } else if (statusUpload == true) {
+      statusUploadBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD1FAE5),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Text(
+          'Sudah Upload',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
+        ),
+      );
+    } else {
+      statusUploadBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Text(
+          'Belum Upload',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFD97706)),
+        ),
+      );
+    }
+
+    // Action buttons
+    Widget actions;
+    if (isSistem) {
+      final eval = row['eval'] as Evaluasi;
+      actions = Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Tooltip(
+            message: 'Edit Evaluasi',
+            child: InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditEvaluasiScreen(
+                    evaluasi: eval,
+                    onBack: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.edit, size: 18, color: Color(0xFF22C55E)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Tooltip(
+            message: 'Lihat PDF',
+            child: InkWell(
+              onTap: () => _showPdfPreview(eval),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.picture_as_pdf, size: 18, color: Color(0xFFEF4444)),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      final emp = row['emp'] as Employee;
+      if (statusUpload == true) {
+        // Uploaded: View PDF + Upload Baru
+        final up = row['upload'];
+        actions = Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Tooltip(
+              message: 'Lihat PDF',
+              child: InkWell(
+                onTap: () async {
+                  try {
+                    await EvaluationUploadService().downloadPdf(up.fileUrl as String, up.fileName as String);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error membuka PDF: $e'), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.visibility, size: 18, color: Color(0xFF0284C7)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Tooltip(
+              message: 'Upload Baru',
+              child: InkWell(
+                onTap: () => _showUploadDialog(emp, pkwtKe),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F9FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.upload_file, size: 18, color: Color(0xFF0EA5E9)),
+                ),
+              ),
+            ),
+          ],
+        );
+      } else {
+        // Pending: template dicetak, belum ada file upload
+        actions = Tooltip(
+          message: 'Upload Evaluasi',
+          child: InkWell(
+            onTap: () => _showUploadDialog(emp, pkwtKe),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF97316).withOpacity(0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.upload_file, size: 16, color: Color(0xFFF97316)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Upload',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF97316)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade100),
-        ),
+        border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
       ),
       child: Row(
         children: [
@@ -502,29 +776,21 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  evaluasi.employeeName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
-                  ),
+                  name,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
                 ),
-                Text(
-                  evaluasi.employeePosition,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
+                if (position.isNotEmpty)
+                  Text(position, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
               ],
             ),
           ),
           // Tanggal
           Expanded(
-            flex: 1,
             child: Text(
-              DateFormat('dd MMM yyyy').format(evaluasi.tanggalEvaluasi),
+              DateFormat('dd MMM yyyy').format(date),
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
             ),
           ),
-          
           // PKWT Ke
           Expanded(
             child: Center(
@@ -535,85 +801,33 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  "Ke-${evaluasi.pkwtKe}",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryBlue,
-                  ),
+                  'Ke-$pkwtKe',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
                 ),
               ),
             ),
           ),
-
+          // Tipe
+          Expanded(child: Center(child: tipeBadge)),
+          // Status Upload
+          Expanded(child: Center(child: statusUploadBadge)),
           // Actions
           Expanded(
-            flex: 1,
-            child: Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Edit Button
-                  Tooltip(
-                    message: 'Edit Evaluasi',
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditEvaluasiScreen(
-                              evaluasi: evaluasi,
-                              onBack: () => Navigator.pop(context),
-                            ),
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.2)),
-                        ),
-                        child: const Icon(
-                          Icons.edit,
-                          size: 20,
-                          color: Color(0xFF22C55E),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // View PDF Button
-                  Tooltip(
-                    message: 'Lihat PDF',
-                    child: InkWell(
-                      onTap: () => _showPdfPreview(evaluasi),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
-                        ),
-                        child: const Icon(
-                          Icons.picture_as_pdf,
-                          size: 20,
-                          color: Color(0xFFEF4444),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: Center(child: actions),
           ),
         ],
       ),
     );
   }
+
+  void _showUploadDialog(Employee emp, int pkwtKe) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _RiwayatUploadDialog(employee: emp, pkwtKe: pkwtKe),
+    );
+  }
+
 
   Color _getNilaiColor(String nilai) {
     if (nilai.startsWith('A')) {
@@ -934,5 +1148,216 @@ class _KontenRiwayatEvaluasiState extends State<KontenRiwayatEvaluasi> {
   void _exportPdfFromEvaluasi(Evaluasi evaluasi) async {
     // This method is now kept as a backup if needed, but not used by default actions
     // as we prefer the in-app preview dialog.
+  }
+}
+
+/// Dialog upload evaluasi manual dari halaman Riwayat Evaluasi.
+/// pkwtKe serta nama karyawan sudah ter-preset di header.
+class _RiwayatUploadDialog extends StatefulWidget {
+  final Employee employee;
+  final int pkwtKe;
+
+  const _RiwayatUploadDialog({required this.employee, required this.pkwtKe});
+
+  @override
+  State<_RiwayatUploadDialog> createState() => _RiwayatUploadDialogState();
+}
+
+class _RiwayatUploadDialogState extends State<_RiwayatUploadDialog> {
+  final _uploadService = EvaluationUploadService();
+  PlatformFile? _selectedFile;
+  bool _isUploading = false;
+
+  Future<void> _pickFile() async {
+    try {
+      final file = await _uploadService.pickPdfFile();
+      if (file != null && mounted) setState(() => _selectedFile = file);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error memilih file: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _uploadFile() async {
+    if (_selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih file PDF terlebih dahulu'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    setState(() => _isUploading = true);
+    try {
+      final evaluationUpload = await _uploadService.uploadEvaluationPdf(
+        employeeId: widget.employee.id,
+        pdfFile: _selectedFile!,
+        pkwtKe: widget.pkwtKe,
+      );
+      if (mounted) {
+        await Provider.of<EvaluationUploadProvider>(context, listen: false)
+            .addEvaluationUpload(evaluationUpload);
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Evaluasi manual berhasil disimpan!'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error upload: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: 500,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.upload_file, color: AppColors.primaryBlue, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Upload Evaluasi Manual',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                      ),
+                      if (widget.employee.nama.isNotEmpty)
+                        Text(
+                          '${widget.employee.nama} · PKWT Ke-${widget.pkwtKe}',
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                        ),
+                    ],
+                  ),
+                ),
+                if (!_isUploading)
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close, color: Colors.grey.shade400),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // File picker area
+            InkWell(
+              onTap: _isUploading ? null : _pickFile,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _selectedFile != null ? AppColors.primaryBlue : Colors.grey.shade300,
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  color: _selectedFile != null
+                      ? AppColors.primaryBlue.withOpacity(0.04)
+                      : Colors.grey.shade50,
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      _selectedFile != null ? Icons.check_circle : Icons.cloud_upload,
+                      size: 48,
+                      color: _selectedFile != null ? AppColors.primaryBlue : Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _selectedFile != null
+                          ? _selectedFile!.name
+                          : 'Klik untuk pilih file PDF evaluasi',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: _selectedFile != null ? FontWeight.w600 : FontWeight.normal,
+                        color: _selectedFile != null ? AppColors.primaryBlue : Colors.grey.shade600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_selectedFile != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${(_selectedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            if (_isUploading) ...[
+              const SizedBox(height: 16),
+              LinearProgressIndicator(
+                backgroundColor: Colors.grey.shade200,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text('Menyimpan...', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+              ),
+            ],
+
+            const SizedBox(height: 24),
+
+            // Action buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (!_isUploading) ...[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Batal'),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                ElevatedButton.icon(
+                  onPressed: _isUploading ? null : _uploadFile,
+                  icon: _isUploading
+                      ? const SizedBox(
+                          width: 16, height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.upload),
+                  label: Text(_isUploading ? 'Menyimpan...' : 'Simpan'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

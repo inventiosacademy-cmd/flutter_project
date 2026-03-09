@@ -81,4 +81,18 @@ class Employee {
       pkwtKe: map['pkwtKe'] ?? 1,
     );
   }
+
+  factory Employee.empty() {
+    final now = DateTime.now();
+    return Employee(
+      id: '',
+      nama: '',
+      posisi: '',
+      departemen: '',
+      atasanLangsung: '',
+      tglMasuk: now,
+      tglPkwtBerakhir: now,
+      pkwtKe: 1,
+    );
+  }
 }
