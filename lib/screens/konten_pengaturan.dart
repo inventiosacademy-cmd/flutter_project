@@ -170,27 +170,7 @@ class _SettingsContentState extends State<SettingsContent> {
             onTap: () => _showEmailNotificationSettings(context),
           ),
           
-          _buildSectionHeader("Informasi Aplikasi"),
-          _buildActionItem(
-            icon: Icons.menu_book_rounded,
-            title: "Panduan Aplikasi",
-            subtitle: "Cara menggunakan aplikasi HR Dashboard",
-            onTap: () => _showFeatureComingSoon(context, "Panduan Aplikasi"),
-          ),
-          const Divider(height: 1, indent: 64, color: Color(0xFFF1F5F9)),
-          _buildActionItem(
-            icon: Icons.privacy_tip_outlined,
-            title: "Kebijakan Privasi",
-            subtitle: "Bagaimana kami mengelola data Anda",
-            onTap: () => _showFeatureComingSoon(context, "Kebijakan Privasi"),
-          ),
-          const Divider(height: 1, indent: 64, color: Color(0xFFF1F5F9)),
-          _buildActionItem(
-            icon: Icons.info_outline_rounded,
-            title: "Tentang Aplikasi",
-            subtitle: "Versi 1.0.0",
-            onTap: () => _showFeatureComingSoon(context, "Info Aplikasi"),
-          ),
+
 
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           _buildActionItem(
@@ -494,27 +474,70 @@ class _SettingsContentState extends State<SettingsContent> {
   void _resetPassword(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && user.email != null) {
-      // ... existing code ...
+      // Tampilkan dialog konfirmasi
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.lock_reset, color: AppColors.primaryBlue),
+              SizedBox(width: 12),
+              Text("Ubah Password"),
+            ],
+          ),
+          content: Text(
+            "Link untuk mengubah kata sandi akan dikirimkan ke email Anda (${user.email}). Apakah Anda ingin melanjutkannya?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("Kirim Link"),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
       try {
         await FirebaseAuth.instance.sendPasswordResetEmail(email: user.email!);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Email reset password telah dikirim"),
+              content: Text("Email reset password telah dikirim ke email Anda. Silakan periksa kotak masuk."),
               backgroundColor: Colors.green,
             ),
           );
         }
       } catch (e) {
-        // ... existing error handling ...
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Gagal mengirim email reset password: $e"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Gagal mengidentifikasi email pengguna saat ini."),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
-  }
-  
-  void _showFeatureComingSoon(BuildContext context, String title) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("$title akan segera tersedia.")),
-    );
   }
 
   void _showLogoutDialog(BuildContext context) {
