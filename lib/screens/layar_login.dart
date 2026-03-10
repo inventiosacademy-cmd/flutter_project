@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/prov_auth.dart';
@@ -47,6 +48,193 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _showForgotPasswordDialog(BuildContext ctx) {
+    final emailCtrl = TextEditingController(text: _usernameController.text);
+    bool sending = false;
+
+    showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (_, setState2) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.lock_reset_rounded,
+                    color: Color(0xFF2563EB), size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Text('Reset Password',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Masukkan email Anda. Link reset password akan dikirim ke inbox Anda.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  autofocus: true,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    hintText: 'nama@perusahaan.com',
+                    prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF2563EB), width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx),
+              child: const Text('Batal',
+                  style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: sending
+                  ? null
+                  : () async {
+                      final email = emailCtrl.text.trim();
+                      if (email.isEmpty || !email.contains('@')) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                              content: Text('Masukkan email yang valid'),
+                              backgroundColor: Colors.red),
+                        );
+                        return;
+                      }
+                      setState2(() => sending = true);
+                      try {
+                        await FirebaseAuth.instance
+                            .sendPasswordResetEmail(email: email);
+                        if (dCtx.mounted) Navigator.pop(dCtx);
+                        if (ctx.mounted) _showEmailSentDialog(ctx, email);
+                      } on FirebaseAuthException catch (e) {
+                        setState2(() => sending = false);
+                        String msg = 'Terjadi kesalahan. Coba lagi.';
+                        if (e.code == 'user-not-found') {
+                          msg = 'Email tidak terdaftar.';
+                        } else if (e.code == 'invalid-email') {
+                          msg = 'Format email tidak valid.';
+                        } else if (e.code == 'too-many-requests') {
+                          msg = 'Terlalu banyak permintaan. Coba lagi nanti.';
+                        }
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                                content: Text(msg),
+                                backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white)))
+                  : const Text('Kirim Link Reset',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEmailSentDialog(BuildContext ctx, String email) {
+    showDialog(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+        actionsPadding: const EdgeInsets.all(16),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF0FDF4),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.mark_email_read_outlined,
+                  color: Color(0xFF16A34A), size: 32),
+            ),
+            const SizedBox(height: 12),
+            const Text('Email Terkirim!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Link reset password telah dikirim ke:\n$email\n\nSilakan cek inbox atau folder Spam Anda, lalu klik link di email untuk membuat password baru.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+              fontSize: 13, color: Color(0xFF64748B), height: 1.6),
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(dCtx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Mengerti',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _login() async {
@@ -183,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                             ),
                                           ),
                                           TextButton(
-                                            onPressed: () {},
+                                            onPressed: () => _showForgotPasswordDialog(context),
                                             style: TextButton.styleFrom(
                                               padding: EdgeInsets.zero,
                                               minimumSize: Size.zero,
