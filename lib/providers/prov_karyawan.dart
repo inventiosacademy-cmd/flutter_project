@@ -11,17 +11,14 @@ class EmployeeProvider with ChangeNotifier {
   bool _isLoading = true;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  StreamSubscription? _employeeSubscription;
   String? _userId;
 
   EmployeeProvider() {
     // Listen to Auth state to handle login/logout
     _auth.authStateChanges().listen((User? user) {
-      _employeeSubscription?.cancel();
-      
       if (user != null) {
         _userId = user.uid;
-        _initRealtimeUpdates(user.uid);
+        _loadEmployees(user.uid);
       } else {
         _userId = null;
         _employees = [];
@@ -31,30 +28,35 @@ class EmployeeProvider with ChangeNotifier {
     });
   }
 
-  void _initRealtimeUpdates(String userId) {
+  Future<void> _loadEmployees(String userId) async {
     _isLoading = true;
     notifyListeners();
 
-    _employeeSubscription = _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('employees')
-        .orderBy('tglMasuk', descending: true)
-        .snapshots()
-        .listen((snapshot) {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('employees')
+          .orderBy('tglMasuk', descending: true)
+          .get();
+
       _employees = snapshot.docs.map((doc) {
         return Employee.fromMap(doc.data());
       }).toList();
-      _isLoading = false;
-      notifyListeners();
-    }, onError: (e) {
+    } catch (e) {
       debugPrint("Error fetching employees: $e");
+    } finally {
       _isLoading = false;
       notifyListeners();
-    });
+    }
   }
 
-
+  /// Reload data dari server manual (jika dibutuhkan)
+  Future<void> refreshEmployees() async {
+    if (_userId != null) {
+      await _loadEmployees(_userId!);
+    }
+  }
 
   List<Employee> get employees => [..._employees];
   bool get isLoading => _isLoading;
@@ -77,6 +79,10 @@ class EmployeeProvider with ChangeNotifier {
           .collection('employees')
           .doc(employee.id)
           .set(employee.toMap());
+
+      // Tulis ke RAM agar langsung refresh
+      _employees.insert(0, employee);
+      notifyListeners();
 
     } catch (e) {
       debugPrint("Error adding employee: $e");
@@ -114,6 +120,12 @@ class EmployeeProvider with ChangeNotifier {
       await batch.commit();
       debugPrint("Batch committed successfully!");
 
+      // Tulis ke RAM untuk semuanya agar langsung refresh
+      _employees.addAll(employees);
+      // Sort ulang berdasar tanggal masuk
+      _employees.sort((a, b) => b.tglMasuk.compareTo(a.tglMasuk));
+      notifyListeners();
+
     } catch (e) {
       debugPrint("Error adding employees batch: $e");
       throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
@@ -132,6 +144,13 @@ class EmployeeProvider with ChangeNotifier {
           .doc(employee.id)
           .update(employee.toMap());
 
+      // Tulis (Update) ke RAM agar langsung refresh
+      final index = _employees.indexWhere((e) => e.id == employee.id);
+      if (index != -1) {
+        _employees[index] = employee;
+        notifyListeners();
+      }
+
     } catch (e) {
       debugPrint("Error updating employee: $e");
       throw Exception(ErrorHelper.getErrorMessage(e, context: 'Karyawan'));
@@ -149,6 +168,10 @@ class EmployeeProvider with ChangeNotifier {
           .collection('employees')
           .doc(id)
           .delete();
+
+      // Hapus dari RAM agar langsung refresh
+      _employees.removeWhere((e) => e.id == id);
+      notifyListeners();
 
     } catch (e) {
       debugPrint("Error deleting employee: $e");

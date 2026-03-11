@@ -44,7 +44,7 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
       _pkwtProvider = Provider.of<PkwtProvider>(context, listen: false);
       _evalUploadProvider = Provider.of<EvaluationUploadProvider>(context, listen: false);
       _pkwtProvider!.initPkwtListener(widget.employee.id);
-      _evalUploadProvider!.initEvaluationListener(widget.employee.id);
+      _evalUploadProvider!.loadEvaluationUploads(widget.employee.id);
     });
   }
 
@@ -52,7 +52,7 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
   void dispose() {
     // Use stored refs — safe to call after widget is deactivated
     _pkwtProvider?.cancelListener(widget.employee.id);
-    _evalUploadProvider?.cancelListener(widget.employee.id);
+    _evalUploadProvider?.cleanupEmployeeData(widget.employee.id);
     super.dispose();
   }
 
@@ -148,11 +148,7 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                       const SizedBox(height: 28),
                       Consumer<EmployeeProvider>(
                         builder: (context, provider, _) {
-                          final index = provider.employees.indexWhere((e) => e.id == widget.employee.id);
-                          final displayId = index != -1 
-                              ? "EMP-${DateTime.now().year}-${(index + 1).toString().padLeft(3, '0')}"
-                              : widget.employee.id;
-                          return _buildLeftPanelItem("ID Karyawan", displayId);
+                          return _buildLeftPanelItem("ID Karyawan", widget.employee.id);
                         },
                       ),
                       const SizedBox(height: 24),
@@ -414,8 +410,6 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              _buildUploadButton(context),
             ],
           );
         }
@@ -508,11 +502,6 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                             },
                             tooltip: 'Lihat PDF',
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.upload_file, color: Color(0xFF0EA5E9)),
-                            onPressed: () => _showUploadDialog(context, pkwtKe),
-                            tooltip: 'Upload Baru',
-                          ),
                         ],
                       );
                     }
@@ -559,41 +548,13 @@ class _KontenDetailKaryawanState extends State<KontenDetailKaryawan> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            _buildUploadButton(context),
           ],
         );
       },
     );
   }
 
-  /// Tombol Upload Evaluasi Manual – membuka dialog upload dengan pkwtKe pre-filled
-  Widget _buildUploadButton(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: () => _showUploadDialog(context, widget.employee.pkwtKe),
-      icon: const Icon(Icons.upload_file, size: 18),
-      label: const Text('Upload Evaluasi Manual'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF0EA5E9),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
-  /// Inline upload dialog dengan pkwtKe sudah terisi
-  void _showUploadDialog(BuildContext context, int pkwtKe) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _EvalUploadInlineDialog(
-        employee: widget.employee,
-        pkwtKe: pkwtKe,
-      ),
-    );
-  }
+  // Removed _buildUploadButton and _showUploadDialog as requested
 
   void _showPdfPreview(Evaluasi evaluasi) {
     // Generate evaluation data

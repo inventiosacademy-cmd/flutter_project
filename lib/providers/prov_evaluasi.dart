@@ -28,20 +28,30 @@ class EvaluasiProvider with ChangeNotifier {
         .collection('evaluasi');
   }
 
-  // Initialize and listen to Firestore changes
-  void init() {
+  // Initialize and load from Firestore once
+  Future<void> init() async {
     if (_userId == null) return;
     
-    _evaluasiCollection
-        .orderBy('tanggalEvaluasi', descending: true)
-        .snapshots()
-        .listen((snapshot) {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final snapshot = await _evaluasiCollection
+          .orderBy('tanggalEvaluasi', descending: true)
+          .get();
+
       _evaluasiList = snapshot.docs.map((doc) => _fromFirestore(doc)).toList();
-      notifyListeners();
-    }, onError: (e) {
+    } catch (e) {
       _error = ErrorHelper.getErrorMessage(e, context: 'Evaluasi');
+    } finally {
+      _isLoading = false;
       notifyListeners();
-    });
+    }
+  }
+
+  // Reload manual jika dibutuhkan
+  Future<void> refreshEvaluasi() async {
+    await init();
   }
 
   // Convert Firestore document to Evaluasi
@@ -153,6 +163,9 @@ class EvaluasiProvider with ChangeNotifier {
       
       await _evaluasiCollection.doc(evaluasi.id).set(_toFirestore(evaluasi));
       
+      // Update RAM
+      _evaluasiList.insert(0, evaluasi);
+      
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -171,6 +184,12 @@ class EvaluasiProvider with ChangeNotifier {
       
       await _evaluasiCollection.doc(id).update(_toFirestore(updatedEvaluasi));
       
+      // Update RAM
+      final index = _evaluasiList.indexWhere((e) => e.id == id);
+      if (index != -1) {
+        _evaluasiList[index] = updatedEvaluasi;
+      }
+      
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -188,6 +207,9 @@ class EvaluasiProvider with ChangeNotifier {
       notifyListeners();
       
       await _evaluasiCollection.doc(id).delete();
+      
+      // Update RAM
+      _evaluasiList.removeWhere((e) => e.id == id);
       
       _isLoading = false;
       notifyListeners();

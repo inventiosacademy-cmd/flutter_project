@@ -85,7 +85,7 @@ function createEmailTemplate(employees: Array<Employee & { hariExpired: number }
         
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">⚠️ Pengingat PKWT Segera Berakhir</h1>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Pengingat PKWT Segera Berakhir</h1>
           <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">HR Dashboard Notification System</p>
         </div>
         
@@ -299,7 +299,7 @@ export const sendPkwtExpirationNotification = onSchedule(
                         const mailOptions = {
                             from: `"HR Dashboard" <${emailPengirim}>`,
                             to: emailPenerima,
-                            subject: `⚠️ [HR Dashboard] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
+                            subject: `[HR Dashboard] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
                             html: emailHtml,
                         };
 
@@ -454,11 +454,13 @@ export const testEmailNotification = onRequest(
                     .doc("notifications")
                     .get();
 
+                const ccEmail = req.body.cc as string || "";
+
                 if (userSettingsDoc.exists) {
                     const userSettings = userSettingsDoc.data()!;
                     emailPenerima = userSettings.emailPenerima || "";
 
-                    if (emailPenerima) {
+                    if (emailPenerima || ccEmail) {
                         testUserId = requestedUserId;
                     } else {
                         res.status(400).json({
@@ -468,11 +470,15 @@ export const testEmailNotification = onRequest(
                         return;
                     }
                 } else {
-                    res.status(400).json({
-                        success: false,
-                        message: `User ${requestedUserId} has no notification settings. Please set up in Pengaturan.`,
-                    });
-                    return;
+                    if (ccEmail) {
+                        testUserId = requestedUserId;
+                    } else {
+                        res.status(400).json({
+                            success: false,
+                            message: `User ${requestedUserId} has no notification settings. Please set up in Pengaturan.`,
+                        });
+                        return;
+                    }
                 }
             } else {
                 // Fallback: Use the authenticated user
@@ -491,7 +497,9 @@ export const testEmailNotification = onRequest(
                     emailPenerima = userSettings.emailPenerima || "";
                 }
 
-                if (!emailPenerima) {
+                const ccEmail = req.body.cc as string || "";
+
+                if (!emailPenerima && !ccEmail) {
                     res.status(400).json({
                         success: false,
                         message: `User ${testUserId} has no recipient email configured. Please set up in Pengaturan.`,
@@ -503,15 +511,36 @@ export const testEmailNotification = onRequest(
             console.log(`📧 Testing with user ${testUserId}, recipient: ${emailPenerima}`);
 
             // 3. Get expiring UNEVALUATED employees for this test user (within 30 days)
-            const employeesSnapshot = await db
-                .collection("users")
-                .doc(testUserId!)
-                .collection("employees")
-                .get();
+            const targetEmployeeId = req.body.employeeId as string | undefined;
+
+            let empDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+
+            if (targetEmployeeId) {
+                console.log(`🔍 Filtering to specific employee ID: ${targetEmployeeId}`);
+                const empDoc = await db
+                    .collection("users")
+                    .doc(testUserId!)
+                    .collection("employees")
+                    .doc(targetEmployeeId)
+                    .get();
+
+                if (empDoc.exists) {
+                    empDocs = [empDoc];
+                } else {
+                    console.log(`❌ Target employee ${targetEmployeeId} not found`);
+                }
+            } else {
+                const employeesSnapshot = await db
+                    .collection("users")
+                    .doc(testUserId!)
+                    .collection("employees")
+                    .get();
+                empDocs = employeesSnapshot.docs;
+            }
 
             const unevaluatedExpiringEmployees: Array<Employee & { hariExpired: number }> = [];
 
-            for (const empDoc of employeesSnapshot.docs) {
+            for (const empDoc of empDocs) {
                 const emp = empDoc.data() as Employee;
                 const hariExpired = hitungHariMenujuExpired(emp.tglPkwtBerakhir);
 
@@ -559,14 +588,13 @@ export const testEmailNotification = onRequest(
 
                 const mailPayload: nodemailer.SendMailOptions = {
                     from: `"HR Dashboard" <${emailPengirim}>`,
-                    to: emailPenerima,
-                    subject: `⚠️ [HR Dashboard] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
+                    to: ccEmail ? ccEmail : emailPenerima,
+                    subject: `[HR Dashboard] ${unevaluatedExpiringEmployees.length} Karyawan Perlu Evaluasi PKWT`,
                     html: emailHtml,
                 };
 
                 if (ccEmail) {
-                    mailPayload.cc = ccEmail;
-                    console.log(`📋 Adding CC: ${ccEmail}`);
+                    console.log(`📋 Sending manually using CC email(s) as primary recipient: ${ccEmail}`);
                 }
 
                 await transporter.sendMail(mailPayload);

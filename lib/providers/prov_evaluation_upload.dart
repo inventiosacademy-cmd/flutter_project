@@ -7,8 +7,6 @@ import '../utils/error_helper.dart';
 
 class EvaluationUploadProvider with ChangeNotifier {
   final Map<String, List<EvaluationUpload>> _evaluationUploads = {};
-  final Map<String, StreamSubscription?> _subscriptions = {};
-  StreamSubscription? _globalSubscription;
   bool _isLoading = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -62,74 +60,33 @@ class EvaluationUploadProvider with ChangeNotifier {
     return list;
   }
 
-  /// Start a global realtime listener across ALL employees using a collectionGroup query.
-  /// This allows the dashboard to reactively know upload status for every employee.
-  void initGlobalListener() {
+  /// Load evaluation uploads for an employee only once
+  Future<void> loadEvaluationUploads(String employeeId) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
-
-    _globalSubscription?.cancel();
-
-    // Listen to the employees collection for this user.
-    // For each employee found, initialise a per-employee evaluation_uploads
-    // listener (which uses the specific path already allowed by Firestore rules).
-    _globalSubscription = _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('employees')
-        .snapshots()
-        .listen((snapshot) {
-      for (final doc in snapshot.docs) {
-        final empId = doc.id;
-        // Only create a listener if one doesn't already exist
-        if (!_subscriptions.containsKey(empId)) {
-          initEvaluationListener(empId);
-        }
-      }
-    }, onError: (e) {
-      debugPrint('EvaluationUploadProvider: global listener error: $e');
-    });
-  }
-
-  /// Stop global listener
-  void cancelGlobalListener() {
-    _globalSubscription?.cancel();
-    _globalSubscription = null;
-  }
-
-
-  /// Initialize realtime listener for employee's evaluation uploads
-  void initEvaluationListener(String employeeId) {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) return;
-
-    // Cancel existing subscription if any
-    _subscriptions[employeeId]?.cancel();
 
     _isLoading = true;
     notifyListeners();
 
-    // Subscribe to evaluation_uploads subcollection
-    _subscriptions[employeeId] = _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('employees')
-        .doc(employeeId)
-        .collection('evaluation_uploads')
-        .orderBy('uploadedAt', descending: true) // Latest first
-        .snapshots()
-        .listen((snapshot) {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('employees')
+          .doc(employeeId)
+          .collection('evaluation_uploads')
+          .orderBy('uploadedAt', descending: true)
+          .get();
+
       _evaluationUploads[employeeId] = snapshot.docs.map((doc) {
         return EvaluationUpload.fromMap(doc.data());
       }).toList();
-      
-      _isLoading = false;
-      notifyListeners();
-    }, onError: (e) {
+    } catch (e) {
       debugPrint('Error fetching evaluation uploads: $e');
+    } finally {
       _isLoading = false;
       notifyListeners();
-    });
+    }
   }
 
 
@@ -151,31 +108,31 @@ class EvaluationUploadProvider with ChangeNotifier {
           .doc(document.id)
           .set(document.toMap());
 
+      // Tulis manual ke RAM
+      if (_evaluationUploads[document.employeeId] == null) {
+        _evaluationUploads[document.employeeId] = [];
+      }
+      _evaluationUploads[document.employeeId]!.insert(0, document);
+
       // Clear pending flag for this employee + pkwtKe
       _pendingManualEvals[document.employeeId]?.remove(document.pkwtKe);
       
       debugPrint('Evaluation upload added successfully: ${document.fileName}');
+      notifyListeners();
     } catch (e) {
       debugPrint('Error adding evaluation upload: $e');
       throw Exception(ErrorHelper.getErrorMessage(e, context: 'menyimpan evaluasi'));
     }
   }
 
-  /// Cancel specific employee subscription
-  void cancelListener(String employeeId) {
-    _subscriptions[employeeId]?.cancel();
-    _subscriptions.remove(employeeId);
+  /// Remove loaded uploads from RAM
+  void cleanupEmployeeData(String employeeId) {
     _evaluationUploads.remove(employeeId);
+    notifyListeners();
   }
 
   @override
   void dispose() {
-    // Cancel all subscriptions
-    _globalSubscription?.cancel();
-    for (var subscription in _subscriptions.values) {
-      subscription?.cancel();
-    }
-    _subscriptions.clear();
     _evaluationUploads.clear();
     super.dispose();
   }

@@ -62,13 +62,7 @@ class _DashboardContentState extends State<DashboardContent> {
   @override
   void initState() {
     super.initState();
-    // Start global listener so dashboard can see manual evaluation uploads reactively
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Provider.of<EvaluationUploadProvider>(context, listen: false)
-            .initGlobalListener();
-      }
-    });
+    // Start global listener removed, handled by simple gets when needed
   }
 
   @override
@@ -761,7 +755,7 @@ class _DashboardContentState extends State<DashboardContent> {
           Expanded(
             flex: 1,
             child: Text(
-              "EMP-${DateTime.now().year}-${(index + 1).toString().padLeft(3, '0')}",
+              emp.id,
               style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
             ),
           ),
@@ -1134,10 +1128,10 @@ class _DashboardContentState extends State<DashboardContent> {
                   controller: ccController,
                   autofocus: true,
                   decoration: InputDecoration(
-                    hintText: "contoh@email.com",
+                    hintText: "email1@contoh.com, email2@contoh.com",
                     hintStyle: TextStyle(color: Colors.grey.shade400),
                     prefixIcon: const Icon(Icons.alternate_email, color: AppColors.primaryBlue),
-                    helperText: "Email yang akan menerima notifikasi pengingat PKWT",
+                    helperText: "Gunakan koma (,) untuk mengirim ke beberapa email",
                     helperStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),

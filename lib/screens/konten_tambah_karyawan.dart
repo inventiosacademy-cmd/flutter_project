@@ -42,6 +42,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
   final _formKey = GlobalKey<FormState>();
 
   late TextEditingController _namaController;
+  late TextEditingController _idController;
   late TextEditingController _posisiController;
   late TextEditingController _atasanController;
 
@@ -58,6 +59,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     super.initState();
     final e = widget.employeeToEdit;
     _namaController = TextEditingController(text: e?.nama ?? '');
+    _idController = TextEditingController(text: e?.id ?? '');
     _posisiController = TextEditingController(text: e?.posisi ?? '');
     _atasanController = TextEditingController(text: e?.atasanLangsung ?? '');
 
@@ -147,8 +149,10 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
 
       // Use the FIRST entry's dates as the Employee's primary contract dates
       final firstEntry = _pkwtEntries.first;
+      final newEmployeeId = _idController.text.trim();
+          
       final newEmployee = Employee(
-        id: widget.employeeToEdit?.id ?? const Uuid().v4(),
+        id: newEmployeeId,
         nama: _namaController.text,
         posisi: _posisiController.text,
         departemen: _departemen,
@@ -538,6 +542,7 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
   @override
   void dispose() {
     _namaController.dispose();
+    _idController.dispose();
     _posisiController.dispose();
     _atasanController.dispose();
     for (final e in _pkwtEntries) {
@@ -611,6 +616,14 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
                     icon: Icons.person_rounded,
                     children: [
                       _buildTextField(_namaController, 'Nama Lengkap', Icons.badge_rounded),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        _idController, 
+                        'ID Karyawan', 
+                        Icons.numbers_rounded,
+                        isRequired: true,
+                        readOnly: widget.employeeToEdit != null,
+                      ),
                       const SizedBox(height: 16),
                       _buildTextField(_posisiController, 'Posisi / Jabatan', Icons.work_rounded),
                       const SizedBox(height: 16),
@@ -694,15 +707,16 @@ class _KontenTambahKaryawanState extends State<KontenTambahKaryawan> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isRequired = true, bool readOnly = false}) {
     return TextFormField(
       controller: controller,
-      validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
+      readOnly: readOnly,
+      validator: (v) => isRequired && v!.isEmpty ? 'Wajib diisi' : null,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: readOnly ? Colors.grey.shade200 : Colors.grey.shade50,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
       ),
